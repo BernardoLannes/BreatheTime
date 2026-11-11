@@ -69,6 +69,7 @@ interface StoredState {
   lastSelectedDivisionId: string | null;
   shortcuts: ShortcutConfig;
   presetLabels: string[];
+  unfocusedOpacity?: number;
 }
 
 function getInitialState(): StoredState {
@@ -94,6 +95,10 @@ function getInitialState(): StoredState {
           presetLabels: Array.isArray(parsed.presetLabels)
             ? parsed.presetLabels
             : DEFAULT_PRESET_LABELS,
+          unfocusedOpacity:
+            typeof parsed.unfocusedOpacity === 'number'
+              ? parsed.unfocusedOpacity
+              : 1.0,
         };
       }
     }
@@ -167,7 +172,9 @@ export const App: React.FC = () => {
   // Estado da janela Electron
   const [alwaysOnTop, setAlwaysOnTop] = useState<boolean>(true);
   const [compactMode, setCompactMode] = useState<boolean>(false);
-  const [opacity, setOpacity] = useState<number>(1.0);
+  const [opacity, setOpacity] = useState<number>(
+    initial.unfocusedOpacity ?? 1.0
+  );
 
   // Navegação e UI
   const [activeTab, setActiveTab] = useState<'timers' | 'history'>('timers');
@@ -194,10 +201,14 @@ export const App: React.FC = () => {
     window.electronAPI?.getState().then((st) => {
       setAlwaysOnTop(st.alwaysOnTop);
       setCompactMode(st.compactMode);
-      setOpacity(st.opacity);
+      if (initial.unfocusedOpacity && initial.unfocusedOpacity < 1) {
+        window.electronAPI?.setOpacity(initial.unfocusedOpacity);
+      } else {
+        setOpacity(st.opacity);
+      }
       window.electronAPI?.updateShortcuts(initial.shortcuts);
     });
-  }, [initial.shortcuts]);
+  }, [initial.shortcuts, initial.unfocusedOpacity]);
 
   // Persistir no localStorage sempre que mudar
   useEffect(() => {
@@ -210,6 +221,7 @@ export const App: React.FC = () => {
       lastSelectedDivisionId: selectedDivisionId,
       shortcuts,
       presetLabels,
+      unfocusedOpacity: opacity,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
@@ -225,6 +237,7 @@ export const App: React.FC = () => {
     selectedDivisionId,
     shortcuts,
     presetLabels,
+    opacity,
   ]);
 
   const handleTogglePlayDivision = useCallback(

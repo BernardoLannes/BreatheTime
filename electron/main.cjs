@@ -217,6 +217,20 @@ function createWindow() {
     saveCurrentWindowBounds();
   });
 
+  // Quando a janela está selecionada (em foco), volta para 100% de opacidade;
+  // quando perde o foco (blur), aplica a transparência configurada pelo usuário
+  mainWindow.on('focus', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setOpacity(1.0);
+    }
+  });
+
+  mainWindow.on('blur', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setOpacity(currentOpacity);
+    }
+  });
+
   const isDevFlag = process.argv.includes('--dev');
   const distIndex = path.join(__dirname, '..', 'dist', 'index.html');
 
@@ -275,11 +289,23 @@ ipcMain.handle('window:ensure-compact-height', (_event, minHeightNeeded) => {
   }
 });
 
+let opacityPreviewTimer = null;
+
 ipcMain.handle('window:set-opacity', (_event, value) => {
   if (!mainWindow) return currentOpacity;
   const clamped = Math.max(0.35, Math.min(1.0, Number(value) || 1.0));
   currentOpacity = clamped;
+
+  // Mostra uma prévia rápida do nível escolhido e, se a janela continuar selecionada (em foco),
+  // volta para 100% até que o usuário clique fora da janela (blur)
   mainWindow.setOpacity(clamped);
+  if (opacityPreviewTimer) clearTimeout(opacityPreviewTimer);
+  opacityPreviewTimer = setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) {
+      mainWindow.setOpacity(1.0);
+    }
+  }, 900);
+
   return currentOpacity;
 });
 
