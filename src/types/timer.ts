@@ -62,6 +62,7 @@ declare global {
       getState: () => Promise<ElectronWindowState>;
       toggleAlwaysOnTop: () => Promise<boolean>;
       setCompactMode: (compact?: boolean) => Promise<boolean>;
+      ensureCompactHeight: (minHeight: number) => Promise<void>;
       setOpacity: (opacity: number) => Promise<number>;
       updateShortcuts: (shortcuts: ShortcutConfig) => Promise<ShortcutConfig>;
       minimize: () => Promise<void>;

@@ -7,6 +7,10 @@ import {
   Pause,
   Copy,
   Check,
+  Zap,
+  PauseCircle,
+  Play,
+  X,
 } from 'lucide-react';
 import {
   Project,
@@ -170,7 +174,10 @@ export const App: React.FC = () => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectColor, setNewProjectColor] = useState(PROJECT_COLORS[0]);
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
-  const [bannerCopied, setBannerCopied] = useState(false);
+  const [bannerCopiedId, setBannerCopiedId] = useState<string | null>(null);
+
+  // Modal ao sair do modo Multi-Task com cronômetros rodando
+  const [showExitMultiModal, setShowExitMultiModal] = useState(false);
 
   // Tick de relógio para atualizar os cronômetros em tempo real (a cada 250ms)
   const [now, setNow] = useState<number>(() => Date.now());
@@ -270,6 +277,75 @@ export const App: React.FC = () => {
     [autoPauseOthers]
   );
 
+  // Alternar entre Modo 1x (Auto-Pause) e Modo Multi-Task
+  const handleRequestToggleAutoPause = () => {
+    // Se está em 1x (autoPauseOthers === true) -> vai para Multi-Task direto
+    if (autoPauseOthers) {
+      setAutoPauseOthers(false);
+      return;
+    }
+
+    // Se está saindo do Multi-Task (autoPauseOthers === false -> true):
+    const currentlyRunning = divisions.filter((d) => d.isRunning);
+    if (currentlyRunning.length > 0) {
+      // Pergunta qual cronômetro deve continuar ativo ou se deve desativar todos
+      setShowExitMultiModal(true);
+    } else {
+      setAutoPauseOthers(true);
+    }
+  };
+
+  // Mantém apenas 1 cronômetro ativo ao sair do Multi-Task e pausa os demais
+  const handleExitMultiKeepOne = (keepDivisionId: string) => {
+    const currentTs = Date.now();
+    setNow(currentTs);
+    setSelectedDivisionId(keepDivisionId);
+
+    setDivisions((prev) =>
+      prev.map((div) => {
+        if (div.id === keepDivisionId) {
+          return div;
+        }
+        if (div.isRunning) {
+          const elapsed =
+            div.startedAt !== null ? currentTs - div.startedAt : 0;
+          return {
+            ...div,
+            isRunning: false,
+            accumulatedMs: Math.max(0, div.accumulatedMs + elapsed),
+            startedAt: null,
+          };
+        }
+        return div;
+      })
+    );
+
+    setAutoPauseOthers(true);
+    setShowExitMultiModal(false);
+  };
+
+  // Desativa (pausa) todos os cronômetros ao sair do Multi-Task
+  const handleExitMultiPauseAll = () => {
+    const currentTs = Date.now();
+    setNow(currentTs);
+
+    setDivisions((prev) =>
+      prev.map((div) => {
+        if (!div.isRunning) return div;
+        const elapsed = div.startedAt !== null ? currentTs - div.startedAt : 0;
+        return {
+          ...div,
+          isRunning: false,
+          accumulatedMs: Math.max(0, div.accumulatedMs + elapsed),
+          startedAt: null,
+        };
+      })
+    );
+
+    setAutoPauseOthers(true);
+    setShowExitMultiModal(false);
+  };
+
   // Refs para uso no atalho global de Play/Pause
   const divisionsRef = useRef(divisions);
   divisionsRef.current = divisions;
@@ -281,14 +357,12 @@ export const App: React.FC = () => {
       const currentDivs = divisionsRef.current;
       if (currentDivs.length === 0) return;
 
-      // Se houver algum cronômetro rodando, pausa ele (e guarda como selecionado para retomar depois)
       const running = currentDivs.find((d) => d.isRunning);
       if (running) {
         handleTogglePlayDivision(running.id);
         return;
       }
 
-      // Se nenhum estiver rodando, retoma o último selecionado/pausado ou o primeiro da lista
       const target =
         currentDivs.find((d) => d.id === selectedDivisionIdRef.current) ||
         currentDivs[0];
@@ -694,32 +768,114 @@ export const App: React.FC = () => {
   const activeTimeSplit = splitDuration(totalActiveMs);
   const historyTimeSplit = splitDuration(totalHistoryMs);
 
-  // Modo Mini-Barra Flutuante (Pílula)
+  // Modal de Saída do Modo Multi-Task
+  const exitMultiModalNode = showExitMultiModal && (
+    <div className="modal-backdrop no-drag">
+      <div className="exit-multi-modal">
+        <div className="exit-multi-header">
+          <div className="exit-multi-title">
+            <Zap size={15} className="zap-icon" />
+            <span>Sair do Modo Multi-Task</span>
+          </div>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={() => setShowExitMultiModal(false)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <p className="exit-multi-desc">
+          Escolha qual cronômetro deve <strong>continuar ativo</strong> (os demais
+          serão pausados) ou desative todos:
+        </p>
+
+        <div className="exit-multi-list">
+          {runningDivisions.map((div) => {
+            const t = tasks.find((task) => task.id === div.taskId);
+            const p = projects.find((proj) => proj.id === div.projectId);
+            const tm = splitDuration(getDivisionElapsedMs(div, now));
+            return (
+              <button
+                key={div.id}
+                type="button"
+                className="exit-multi-option-btn"
+                onClick={() => handleExitMultiKeepOne(div.id)}
+              >
+                <div className="option-left">
+                  <span
+                    className="proj-dot"
+                    style={{ backgroundColor: p?.color || '#38bdf8' }}
+                  />
+                  <div className="option-texts">
+                    <span className="option-task">
+                      {t?.title || 'Tarefa'}
+                      {div.label ? ` • ${div.label}` : ''}
+                    </span>
+                    <span className="option-proj">{p?.name || 'Projeto'}</span>
+                  </div>
+                </div>
+
+                <div className="option-right">
+                  <span className="option-time">
+                    {tm.paddedHours}h {tm.paddedMinutes}m
+                  </span>
+                  <span className="keep-pill">
+                    <Play size={10} /> Manter ativo
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="exit-multi-footer">
+          <button
+            type="button"
+            className="btn-pause-all-multi"
+            onClick={handleExitMultiPauseAll}
+          >
+            <PauseCircle size={14} />
+            <span>Desativar / Pausar Todos</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn-cancel-multi"
+            onClick={() => setShowExitMultiModal(false)}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Modo Mini-Barra Flutuante / Widget Compacto
   if (compactMode) {
     return (
-      <CompactPillView
-        projects={projects}
-        tasks={tasks}
-        divisions={divisions}
-        activeDivision={activeCompactDivision}
-        now={now}
-        alwaysOnTop={alwaysOnTop}
-        onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
-        onExitCompactMode={() => handleSetCompactMode(false)}
-        onTogglePlayDivision={handleTogglePlayDivision}
-        onAdjustTimeMs={handleAdjustDivisionTimeMs}
-        onUpdateDescription={handleUpdateDivisionDescription}
-        onSelectDivision={(id) => setSelectedDivisionId(id)}
-      />
+      <>
+        <CompactPillView
+          projects={projects}
+          tasks={tasks}
+          divisions={divisions}
+          activeDivision={activeCompactDivision}
+          now={now}
+          alwaysOnTop={alwaysOnTop}
+          autoPauseOthers={autoPauseOthers}
+          onToggleAutoPause={handleRequestToggleAutoPause}
+          onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
+          onExitCompactMode={() => handleSetCompactMode(false)}
+          onTogglePlayDivision={handleTogglePlayDivision}
+          onAdjustTimeMs={handleAdjustDivisionTimeMs}
+          onUpdateDescription={handleUpdateDivisionDescription}
+          onSelectDivision={(id) => setSelectedDivisionId(id)}
+        />
+        {exitMultiModalNode}
+      </>
     );
   }
-
-  const runningTask = primaryRunningDiv
-    ? tasks.find((t) => t.id === primaryRunningDiv.taskId)
-    : null;
-  const runningTime = primaryRunningDiv
-    ? splitDuration(getDivisionElapsedMs(primaryRunningDiv, now))
-    : null;
 
   return (
     <div className="app-shell">
@@ -730,63 +886,73 @@ export const App: React.FC = () => {
         opacity={opacity}
         onChangeOpacity={handleChangeOpacity}
         autoPauseOthers={autoPauseOthers}
-        onToggleAutoPause={() => setAutoPauseOthers((prev) => !prev)}
+        onToggleAutoPause={handleRequestToggleAutoPause}
         runningCount={runningDivisions.length}
         shortcuts={shortcuts}
         onUpdateShortcuts={handleUpdateShortcuts}
       />
 
-      {/* Destaque Fixo do Cronômetro Ativo no Topo (se houver algum rodando) */}
-      {primaryRunningDiv && runningTime && (
-        <div className="active-running-banner">
-          <div className="banner-left">
-            <span className="pulse-dot" />
-            <div className="banner-info">
-              <span className="banner-task-title">
-                {runningTask?.title || 'Tarefa'}
-                {primaryRunningDiv.label ? ` • ${primaryRunningDiv.label}` : ''}
-              </span>
-              <span className="banner-desc-preview">
-                {primaryRunningDiv.description || 'Sem descrição ainda...'}
-              </span>
-            </div>
-          </div>
+      {/* Destaque Fixo dos Cronômetros Ativos no Topo (mostra 1 ou todos em Multi-Task) */}
+      {runningDivisions.length > 0 && (
+        <div className="active-running-stack">
+          {runningDivisions.map((rDiv) => {
+            const rTask = tasks.find((t) => t.id === rDiv.taskId);
+            const rTime = splitDuration(getDivisionElapsedMs(rDiv, now));
+            const isThisCopied = bannerCopiedId === rDiv.id;
 
-          <div className="banner-right">
-            <span className="banner-hm">
-              {runningTime.paddedHours}h {runningTime.paddedMinutes}m{' '}
-              <small>{runningTime.paddedSeconds}s</small>
-            </span>
+            return (
+              <div key={rDiv.id} className="active-running-banner">
+                <div className="banner-left">
+                  <span className="pulse-dot" />
+                  <div className="banner-info">
+                    <span className="banner-task-title">
+                      {rTask?.title || 'Tarefa'}
+                      {rDiv.label ? ` • ${rDiv.label}` : ''}
+                    </span>
+                    <span className="banner-desc-preview">
+                      {rDiv.description || 'Sem descrição ainda...'}
+                    </span>
+                  </div>
+                </div>
 
-            <button
-              type="button"
-              className="banner-btn copy"
-              onClick={async () => {
-                const txt = formatDivisionClipboardText(
-                  primaryRunningDiv.label,
-                  primaryRunningDiv.description,
-                  runningTask?.title || ''
-                );
-                const ok = await copyToClipboard(txt);
-                if (ok) {
-                  setBannerCopied(true);
-                  setTimeout(() => setBannerCopied(false), 1500);
-                }
-              }}
-              title="Copiar descrição do cronômetro ativo"
-            >
-              {bannerCopied ? <Check size={13} /> : <Copy size={13} />}
-            </button>
+                <div className="banner-right">
+                  <span className="banner-hm">
+                    {rTime.paddedHours}h {rTime.paddedMinutes}m{' '}
+                    <small>{rTime.paddedSeconds}s</small>
+                  </span>
 
-            <button
-              type="button"
-              className="banner-btn pause"
-              onClick={() => handleTogglePlayDivision(primaryRunningDiv.id)}
-              title={`Pausar cronômetro ativo (${shortcuts.togglePlay})`}
-            >
-              <Pause size={13} />
-            </button>
-          </div>
+                  <button
+                    type="button"
+                    className="banner-btn copy"
+                    onClick={async () => {
+                      const txt = formatDivisionClipboardText(
+                        rDiv.label,
+                        rDiv.description,
+                        rTask?.title || ''
+                      );
+                      const ok = await copyToClipboard(txt);
+                      if (ok) {
+                        setBannerCopiedId(rDiv.id);
+                        setTimeout(() => setBannerCopiedId(null), 1500);
+                      }
+                    }}
+                    title="Copiar descrição deste cronômetro"
+                  >
+                    {isThisCopied ? <Check size={13} /> : <Copy size={13} />}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="banner-btn pause"
+                    onClick={() => handleTogglePlayDivision(rDiv.id)}
+                    title={`Pausar cronômetro (${shortcuts.togglePlay})`}
+                  >
+                    <Pause size={13} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -935,6 +1101,8 @@ export const App: React.FC = () => {
           />
         )}
       </main>
+
+      {exitMultiModalNode}
     </div>
   );
 };

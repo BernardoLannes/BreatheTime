@@ -5,6 +5,7 @@ let mainWindow = null;
 let isAlwaysOnTop = true;
 let isCompactMode = false;
 let currentOpacity = 1.0;
+let isTransitioningMode = false;
 
 let currentShortcuts = {
   togglePlay: 'Alt+Shift+P',
@@ -12,13 +13,32 @@ let currentShortcuts = {
   toggleMinimize: 'Alt+Shift+B',
 };
 
-// Keep track of full window bounds before switching to compact pill
+// Guarda separadamente o tamanho/posição do modo completo e do modo compacto
 let savedFullBounds = {
-  width: 430,
-  height: 740,
+  width: 440,
+  height: 750,
   x: undefined,
   y: undefined,
 };
+
+let savedCompactBounds = {
+  width: 420,
+  height: 175,
+  x: undefined,
+  y: undefined,
+};
+
+function saveCurrentWindowBounds() {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized() || isTransitioningMode) {
+    return;
+  }
+  const b = mainWindow.getBounds();
+  if (isCompactMode) {
+    savedCompactBounds = { ...b };
+  } else {
+    savedFullBounds = { ...b };
+  }
+}
 
 function applyCompactMode(targetCompact) {
   if (!mainWindow) return isCompactMode;
@@ -37,36 +57,41 @@ function applyCompactMode(targetCompact) {
     return isCompactMode;
   }
 
+  // Salva as dimensões atuais antes de trocar de modo
+  saveCurrentWindowBounds();
+
+  isTransitioningMode = true;
+  const currentBounds = mainWindow.getBounds();
+
   if (nextCompact) {
-    const bounds = mainWindow.getBounds();
-    if (bounds.height > 200) {
-      savedFullBounds = bounds;
-    }
     isCompactMode = true;
-    mainWindow.setMinimumSize(320, 96);
+    mainWindow.setMinimumSize(360, 145);
     mainWindow.setBounds(
       {
-        x: bounds.x,
-        y: bounds.y,
-        width: Math.max(360, Math.min(bounds.width, 430)),
-        height: 112,
+        x: savedCompactBounds.x !== undefined ? savedCompactBounds.x : currentBounds.x,
+        y: savedCompactBounds.y !== undefined ? savedCompactBounds.y : currentBounds.y,
+        width: Math.max(360, savedCompactBounds.width || 420),
+        height: Math.max(145, savedCompactBounds.height || 175),
       },
       true
     );
   } else {
-    const currentBounds = mainWindow.getBounds();
     isCompactMode = false;
     mainWindow.setMinimumSize(360, 420);
     mainWindow.setBounds(
       {
-        x: currentBounds.x,
-        y: currentBounds.y,
-        width: savedFullBounds.width || 430,
-        height: savedFullBounds.height || 740,
+        x: savedFullBounds.x !== undefined ? savedFullBounds.x : currentBounds.x,
+        y: savedFullBounds.y !== undefined ? savedFullBounds.y : currentBounds.y,
+        width: Math.max(380, savedFullBounds.width || 440),
+        height: Math.max(420, savedFullBounds.height || 750),
       },
       true
     );
   }
+
+  setTimeout(() => {
+    isTransitioningMode = false;
+  }, 150);
 
   if (isAlwaysOnTop) {
     mainWindow.setAlwaysOnTop(true, 'floating');
@@ -100,7 +125,6 @@ function registerGlobalShortcuts(shortcutsConfig) {
   };
   currentShortcuts = merged;
 
-  // 1. Play / Pause active timer
   if (merged.togglePlay) {
     try {
       globalShortcut.register(merged.togglePlay, () => {
@@ -113,7 +137,6 @@ function registerGlobalShortcuts(shortcutsConfig) {
     }
   }
 
-  // 2. Toggle Compact Pill <-> Full Expanded Window
   if (merged.toggleCompact) {
     try {
       globalShortcut.register(merged.toggleCompact, () => {
@@ -124,7 +147,6 @@ function registerGlobalShortcuts(shortcutsConfig) {
     }
   }
 
-  // 3. Minimize <-> Restore Window
   if (merged.toggleMinimize) {
     try {
       globalShortcut.register(merged.toggleMinimize, () => {
@@ -143,8 +165,8 @@ function createWindow() {
   const { width: screenWidth, height: screenHeight } =
     primaryDisplay.workAreaSize;
 
-  const initialWidth = 430;
-  const initialHeight = 740;
+  const initialWidth = 440;
+  const initialHeight = 750;
   const initialX = Math.max(20, screenWidth - initialWidth - 24);
   const initialY = Math.max(20, Math.round((screenHeight - initialHeight) / 2));
 
@@ -155,16 +177,23 @@ function createWindow() {
     y: initialY,
   };
 
+  savedCompactBounds = {
+    width: 420,
+    height: 175,
+    x: initialX,
+    y: initialY,
+  };
+
   mainWindow = new BrowserWindow({
     width: initialWidth,
     height: initialHeight,
     x: initialX,
     y: initialY,
-    minWidth: 340,
-    minHeight: 92,
+    minWidth: 360,
+    minHeight: 145,
     frame: false,
     transparent: false,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0b1120',
     alwaysOnTop: isAlwaysOnTop,
     resizable: true,
     hasShadow: true,
@@ -179,6 +208,14 @@ function createWindow() {
   if (isAlwaysOnTop) {
     mainWindow.setAlwaysOnTop(true, 'floating');
   }
+
+  // Sempre que o usuário redimensionar ou mover a janela, memoriza o tamanho do modo atual
+  mainWindow.on('resized', () => {
+    saveCurrentWindowBounds();
+  });
+  mainWindow.on('moved', () => {
+    saveCurrentWindowBounds();
+  });
 
   const isDevFlag = process.argv.includes('--dev');
   const distIndex = path.join(__dirname, '..', 'dist', 'index.html');
@@ -217,6 +254,25 @@ ipcMain.handle('window:toggle-always-on-top', () => {
 
 ipcMain.handle('window:set-compact-mode', (_event, compact) => {
   return applyCompactMode(compact);
+});
+
+// Ajusta altura mínima do modo compacto quando há vários cronômetros rodando em Multi-Task
+ipcMain.handle('window:ensure-compact-height', (_event, minHeightNeeded) => {
+  if (!mainWindow || !isCompactMode) return;
+  const b = mainWindow.getBounds();
+  const targetMin = Math.max(150, Math.min(480, Number(minHeightNeeded) || 175));
+  if (b.height < targetMin) {
+    mainWindow.setBounds(
+      {
+        x: b.x,
+        y: b.y,
+        width: b.width,
+        height: targetMin,
+      },
+      true
+    );
+    savedCompactBounds.height = targetMin;
+  }
 });
 
 ipcMain.handle('window:set-opacity', (_event, value) => {
