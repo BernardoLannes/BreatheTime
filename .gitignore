@@ -1,0 +1,14 @@
+# Dependências
+node_modules/
+
+# Build e Executável Empacotado
+dist/
+release/
+*.lnk
+*.log
+
+# Ambiente e SO
+.env
+.env.local
+.DS_Store
+Thumbs.db
