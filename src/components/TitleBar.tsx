@@ -11,6 +11,7 @@ import {
   Timer,
   Keyboard,
   RotateCcw,
+  Power,
 } from 'lucide-react';
 import { ShortcutConfig } from '../types/timer';
 
@@ -25,6 +26,8 @@ interface TitleBarProps {
   runningCount: number;
   shortcuts: ShortcutConfig;
   onUpdateShortcuts: (next: ShortcutConfig) => void;
+  autoLaunch: boolean;
+  onToggleAutoLaunch: () => void;
 }
 
 const DEFAULT_SHORTCUTS: ShortcutConfig = {
@@ -75,6 +78,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   runningCount,
   shortcuts,
   onUpdateShortcuts,
+  autoLaunch,
+  onToggleAutoLaunch,
 }) => {
   const [showOpacityMenu, setShowOpacityMenu] = useState(false);
   const [showShortcutsMenu, setShowShortcutsMenu] = useState(false);
@@ -163,6 +168,23 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
           {showShortcutsMenu && (
             <div className="shortcuts-popover">
+              {/* Opção de Iniciar junto com o Windows */}
+              <div className="autolaunch-toggle-row">
+                <div className="autolaunch-info">
+                  <Power size={13} className={autoLaunch ? 'power-on' : 'power-off'} />
+                  <span>Iniciar junto com o Windows</span>
+                </div>
+                <button
+                  type="button"
+                  className={`switch-pill ${autoLaunch ? 'on' : 'off'}`}
+                  onClick={onToggleAutoLaunch}
+                >
+                  <span className="switch-knob" />
+                </button>
+              </div>
+
+              <div className="popover-divider" />
+
               <div className="shortcuts-popover-header">
                 <span>Atalhos Globais (em qualquer tela)</span>
                 <button
@@ -281,6 +303,20 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Botão Rápido: Iniciar junto com o Windows */}
+        <button
+          type="button"
+          className={`icon-btn ${autoLaunch ? 'autolaunch-active' : ''}`}
+          onClick={onToggleAutoLaunch}
+          title={
+            autoLaunch
+              ? 'Iniciar com o Windows: ATIVADO (clique para desativar)'
+              : 'Iniciar com o Windows: DESATIVADO (clique para ativar)'
+          }
+        >
+          <Power size={13} />
+        </button>
 
         {/* Botão Modo Pílula (Mini-Barra Flutuante) */}
         <button

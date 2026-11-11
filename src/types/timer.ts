@@ -54,6 +54,7 @@ export interface ElectronWindowState {
   compactMode: boolean;
   opacity: number;
   shortcuts: ShortcutConfig;
+  autoLaunch: boolean;
 }
 
 declare global {
@@ -64,6 +65,7 @@ declare global {
       setCompactMode: (compact?: boolean) => Promise<boolean>;
       ensureCompactHeight: (minHeight: number) => Promise<void>;
       setOpacity: (opacity: number) => Promise<number>;
+      setAutoLaunch: (enabled: boolean) => Promise<boolean>;
       updateShortcuts: (shortcuts: ShortcutConfig) => Promise<ShortcutConfig>;
       minimize: () => Promise<void>;
       close: () => Promise<void>;

@@ -175,6 +175,7 @@ export const App: React.FC = () => {
   const [opacity, setOpacity] = useState<number>(
     initial.unfocusedOpacity ?? 1.0
   );
+  const [autoLaunch, setAutoLaunch] = useState<boolean>(false);
 
   // Navegação e UI
   const [activeTab, setActiveTab] = useState<'timers' | 'history'>('timers');
@@ -201,6 +202,7 @@ export const App: React.FC = () => {
     window.electronAPI?.getState().then((st) => {
       setAlwaysOnTop(st.alwaysOnTop);
       setCompactMode(st.compactMode);
+      setAutoLaunch(Boolean(st.autoLaunch));
       if (initial.unfocusedOpacity && initial.unfocusedOpacity < 1) {
         window.electronAPI?.setOpacity(initial.unfocusedOpacity);
       } else {
@@ -429,6 +431,16 @@ export const App: React.FC = () => {
     if (window.electronAPI) {
       const registered = await window.electronAPI.updateShortcuts(next);
       setShortcuts(registered);
+    }
+  };
+
+  const handleToggleAutoLaunch = async () => {
+    const target = !autoLaunch;
+    if (window.electronAPI) {
+      const updated = await window.electronAPI.setAutoLaunch(target);
+      setAutoLaunch(updated);
+    } else {
+      setAutoLaunch(target);
     }
   };
 
@@ -903,6 +915,8 @@ export const App: React.FC = () => {
         runningCount={runningDivisions.length}
         shortcuts={shortcuts}
         onUpdateShortcuts={handleUpdateShortcuts}
+        autoLaunch={autoLaunch}
+        onToggleAutoLaunch={handleToggleAutoLaunch}
       />
 
       {/* Destaque Fixo dos Cronômetros Ativos no Topo (mostra 1 ou todos em Multi-Task) */}

@@ -171,6 +171,75 @@ button {
   color: var(--accent-primary);
 }
 
+.icon-btn.autolaunch-active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.autolaunch-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.autolaunch-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.power-on {
+  color: #34d399;
+}
+
+.power-off {
+  color: var(--text-muted);
+}
+
+.switch-pill {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.18s ease;
+}
+
+.switch-pill.on {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: #10b981;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #94a3b8;
+  transition: transform 0.18s ease, background-color 0.18s ease;
+}
+
+.switch-pill.on .switch-knob {
+  transform: translateX(16px);
+  background: #34d399;
+}
+
+.popover-divider {
+  height: 1px;
+  background: #334155;
+  margin: 9px 0;
+}
+
 .icon-btn.active-subtle {
   background: rgba(148, 163, 184, 0.12);
   color: #e2e8f0;

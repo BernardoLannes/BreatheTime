@@ -1,11 +1,55 @@
 const { app, BrowserWindow, ipcMain, screen, globalShortcut } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let mainWindow = null;
 let isAlwaysOnTop = true;
 let isCompactMode = false;
 let currentOpacity = 1.0;
 let isTransitioningMode = false;
+
+function getStartupExePath() {
+  // Se estiver rodando do BreatheTime.exe empacotado, usa o próprio process.execPath
+  if (process.execPath.toLowerCase().endsWith('breathetime.exe')) {
+    return process.execPath;
+  }
+  // Caso esteja em modo dev, aponta para o BreatheTime.exe da pasta release se existir
+  const releaseExe = path.resolve(
+    __dirname,
+    '..',
+    'release',
+    'BreatheTime',
+    'BreatheTime.exe'
+  );
+  if (fs.existsSync(releaseExe)) {
+    return releaseExe;
+  }
+  return process.execPath;
+}
+
+function getAutoLaunchEnabled() {
+  try {
+    const exePath = getStartupExePath();
+    const settings = app.getLoginItemSettings({ path: exePath });
+    return Boolean(settings.openAtLogin);
+  } catch {
+    return false;
+  }
+}
+
+function setAutoLaunchEnabled(enabled) {
+  try {
+    const exePath = getStartupExePath();
+    app.setLoginItemSettings({
+      openAtLogin: Boolean(enabled),
+      path: exePath,
+    });
+    return getAutoLaunchEnabled();
+  } catch (e) {
+    console.error('Failed to set login item settings:', e);
+    return false;
+  }
+}
 
 let currentShortcuts = {
   togglePlay: 'Alt+Shift+P',
@@ -253,7 +297,12 @@ ipcMain.handle('window:get-state', () => {
     compactMode: isCompactMode,
     opacity: currentOpacity,
     shortcuts: currentShortcuts,
+    autoLaunch: getAutoLaunchEnabled(),
   };
+});
+
+ipcMain.handle('window:set-auto-launch', (_event, enabled) => {
+  return setAutoLaunchEnabled(enabled);
 });
 
 ipcMain.handle('window:toggle-always-on-top', () => {

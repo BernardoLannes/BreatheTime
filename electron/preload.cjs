@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ensureCompactHeight: (minHeight) =>
     ipcRenderer.invoke('window:ensure-compact-height', minHeight),
   setOpacity: (opacity) => ipcRenderer.invoke('window:set-opacity', opacity),
+  setAutoLaunch: (enabled) => ipcRenderer.invoke('window:set-auto-launch', enabled),
   updateShortcuts: (shortcuts) => ipcRenderer.invoke('window:update-shortcuts', shortcuts),
   minimize: () => ipcRenderer.invoke('window:minimize'),
   close: () => ipcRenderer.invoke('window:close'),
