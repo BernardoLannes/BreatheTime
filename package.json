@@ -76,8 +76,10 @@
       "icon": "electron/icon.png",
       "category": "Utility",
       "maintainer": "BreatheTime <administrador@tedsustentavel.com>",
-      "artifactName": "BreatheTime-${version}-linux-${arch}.${ext}"
+      "artifactName": "BreatheTime-${version}-linux-${arch}.${ext}",
+      "syncDesktopName": true
     }
   },
-  "homepage": "https://github.com/RichardFFreitas/BreatheTime"
+  "homepage": "https://github.com/RichardFFreitas/BreatheTime",
+  "desktopName": "breathe-time.desktop"
 }
