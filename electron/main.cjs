@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, screen, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { registerBitrixIpc } = require('./bitrix.cjs');
 
 let mainWindow = null;
 let isAlwaysOnTop = true;
@@ -369,6 +370,8 @@ ipcMain.handle('window:minimize', () => {
 ipcMain.handle('window:close', () => {
   if (mainWindow) mainWindow.close();
 });
+
+registerBitrixIpc(ipcMain);
 
 app.whenReady().then(() => {
   createWindow();
