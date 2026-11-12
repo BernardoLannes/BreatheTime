@@ -13,3 +13,6 @@ release/
 .DS_Store
 Thumbs.db
 release-installer/
+
+# Credenciais do Bitrix geradas no build
+electron/bitrix-secrets.cjs
