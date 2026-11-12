@@ -18,13 +18,17 @@ import {
   TimerDivision,
   CompletedLogEntry,
   ShortcutConfig,
+  BitrixStatus,
 } from './types/timer';
 import {
   getDivisionElapsedMs,
   splitDuration,
   formatDivisionClipboardText,
+  formatConsolidatedTaskDescription,
   copyToClipboard,
 } from './utils/timeFormat';
+import { BitrixContext, BitrixContextValue } from './bitrix/BitrixContext';
+import { BitrixSettingsModal } from './components/BitrixSettingsModal';
 import { TitleBar } from './components/TitleBar';
 import { CompactPillView } from './components/CompactPillView';
 import { ProjectSection } from './components/ProjectSection';
@@ -186,6 +190,19 @@ export const App: React.FC = () => {
 
   // Modal ao sair do modo Multi-Task com cronômetros rodando
   const [showExitMultiModal, setShowExitMultiModal] = useState(false);
+
+  // Integração Bitrix24 (o segredo vive só no processo main)
+  const [bitrixStatus, setBitrixStatus] = useState<BitrixStatus>({
+    connected: false,
+  });
+  const [showBitrixModal, setShowBitrixModal] = useState(false);
+  const bitrixLocks = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    window.electronAPI?.bitrix.getStatus().then((res) => {
+      if (res.ok) setBitrixStatus(res.data);
+    });
+  }, []);
 
   // Tick de relógio para atualizar os cronômetros em tempo real (a cada 250ms)
   const [now, setNow] = useState<number>(() => Date.now());
@@ -642,6 +659,8 @@ export const App: React.FC = () => {
         description: div.description,
         durationMs: elapsedMs,
         completedAt: currentTs,
+        bitrixTaskId: task?.bitrixTaskId,
+        bitrixLoggedMs: div.loggedMs,
       };
       setHistory((prev) => [logEntry, ...prev]);
     }
@@ -658,6 +677,7 @@ export const App: React.FC = () => {
                 ...d,
                 description: '',
                 accumulatedMs: 0,
+                loggedMs: 0,
                 startedAt: null,
                 isRunning: false,
               }
@@ -689,6 +709,8 @@ export const App: React.FC = () => {
           description: div.description,
           durationMs: elapsedMs,
           completedAt: currentTs,
+          bitrixTaskId: task.bitrixTaskId,
+          bitrixLoggedMs: div.loggedMs,
         });
       }
     }
@@ -706,6 +728,7 @@ export const App: React.FC = () => {
           label: '',
           description: '',
           accumulatedMs: 0,
+          loggedMs: 0,
           startedAt: null,
           isRunning: false,
         },
@@ -747,6 +770,7 @@ export const App: React.FC = () => {
           title: entry.taskTitle,
           isExpanded: true,
           createdAt: Date.now(),
+          bitrixTaskId: entry.bitrixTaskId,
         },
       ]);
     }
@@ -758,6 +782,7 @@ export const App: React.FC = () => {
       label: entry.divisionLabel,
       description: entry.description,
       accumulatedMs: entry.durationMs,
+      loggedMs: entry.bitrixLoggedMs,
       startedAt: null,
       isRunning: false,
       createdAt: Date.now(),
@@ -775,6 +800,152 @@ export const App: React.FC = () => {
   const handleClearHistory = () => {
     setHistory([]);
   };
+
+  // ==================== INTEGRAÇÃO BITRIX24 ====================
+  const handleLinkBitrixTask = (taskId: string, bitrixTaskId: number | undefined) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, bitrixTaskId } : t))
+    );
+  };
+
+  /** Envia o tempo ao Bitrix24. Retorna os ms realmente enviados (arredondados a segundos). */
+  const sendToBitrix = async (
+    lockKey: string,
+    bitrixTaskId: number | undefined,
+    deltaMs: number,
+    comment: string
+  ): Promise<{ ok: boolean; message?: string; sentMs?: number }> => {
+    if (!window.electronAPI) {
+      return { ok: false, message: 'Disponível apenas no aplicativo desktop.' };
+    }
+    if (!bitrixStatus.connected) {
+      return { ok: false, message: 'Conecte-se ao Bitrix24 primeiro.' };
+    }
+    if (!bitrixTaskId) {
+      return { ok: false, message: 'Vincule esta tarefa a uma tarefa do Bitrix24.' };
+    }
+    const seconds = Math.round(deltaMs / 1000);
+    if (seconds < 1) {
+      return { ok: false, message: 'Nenhum tempo novo para lançar.' };
+    }
+    if (bitrixLocks.current.has(lockKey)) {
+      return { ok: false, message: 'Lançamento já em andamento.' };
+    }
+    bitrixLocks.current.add(lockKey);
+    try {
+      const res = await window.electronAPI.bitrix.logTime({
+        taskId: bitrixTaskId,
+        seconds,
+        comment,
+      });
+      if (!res.ok) {
+        if (res.code === 'auth' || res.code === 'not_connected') {
+          setBitrixStatus({ connected: false });
+        }
+        return { ok: false, message: res.message };
+      }
+      return { ok: true, message: `${seconds}s lançados no Bitrix24.`, sentMs: seconds * 1000 };
+    } finally {
+      bitrixLocks.current.delete(lockKey);
+    }
+  };
+
+  const handleLogDivisionToBitrix = async (divisionId: string) => {
+    const div = divisions.find((d) => d.id === divisionId);
+    const task = div && tasks.find((t) => t.id === div.taskId);
+    if (!div || !task) return { ok: false, message: 'Cronômetro não encontrado.' };
+    const delta = getDivisionElapsedMs(div, Date.now()) - (div.loggedMs || 0);
+    const r = await sendToBitrix(
+      `task:${task.id}`,
+      task.bitrixTaskId,
+      delta,
+      formatDivisionClipboardText(div.label, div.description, task.title)
+    );
+    if (r.ok && r.sentMs) {
+      setDivisions((prev) =>
+        prev.map((d) =>
+          d.id === divisionId ? { ...d, loggedMs: (d.loggedMs || 0) + r.sentMs! } : d
+        )
+      );
+    }
+    return r;
+  };
+
+  const handleLogTaskToBitrix = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return { ok: false, message: 'Tarefa não encontrada.' };
+    const ts = Date.now();
+    const parts = divisions
+      .filter((d) => d.taskId === taskId)
+      .map((d) => ({ div: d, delta: getDivisionElapsedMs(d, ts) - (d.loggedMs || 0) }))
+      .filter((p) => p.delta > 0);
+    const total = parts.reduce((acc, p) => acc + p.delta, 0);
+    const r = await sendToBitrix(
+      `task:${taskId}`,
+      task.bitrixTaskId,
+      total,
+      formatConsolidatedTaskDescription(
+        parts.map((p) => p.div),
+        task.title
+      )
+    );
+    if (r.ok) {
+      const deltaById = new Map(parts.map((p) => [p.div.id, p.delta]));
+      setDivisions((prev) =>
+        prev.map((d) =>
+          deltaById.has(d.id)
+            ? { ...d, loggedMs: (d.loggedMs || 0) + deltaById.get(d.id)! }
+            : d
+        )
+      );
+    }
+    return r;
+  };
+
+  const handleLogHistoryEntryToBitrix = async (entryId: string) => {
+    const entry = history.find((h) => h.id === entryId);
+    if (!entry) return { ok: false, message: 'Registro não encontrado.' };
+    const bitrixTaskId =
+      entry.bitrixTaskId ?? tasks.find((t) => t.id === entry.taskId)?.bitrixTaskId;
+    const delta = entry.durationMs - (entry.bitrixLoggedMs || 0);
+    const r = await sendToBitrix(
+      `hist:${entryId}`,
+      bitrixTaskId,
+      delta,
+      formatDivisionClipboardText(entry.divisionLabel, entry.description, entry.taskTitle)
+    );
+    if (r.ok && r.sentMs) {
+      setHistory((prev) =>
+        prev.map((h) =>
+          h.id === entryId
+            ? {
+                ...h,
+                bitrixTaskId,
+                bitrixLoggedMs: Math.min(h.durationMs, (h.bitrixLoggedMs || 0) + r.sentMs!),
+              }
+            : h
+        )
+      );
+    }
+    return r;
+  };
+
+  const bitrixContextValue: BitrixContextValue = {
+    status: bitrixStatus,
+    openSettings: () => setShowBitrixModal(true),
+    linkTask: handleLinkBitrixTask,
+    logDivision: handleLogDivisionToBitrix,
+    logTask: handleLogTaskToBitrix,
+    logHistoryEntry: handleLogHistoryEntryToBitrix,
+  };
+
+  const bitrixModalNode = showBitrixModal && (
+    <BitrixSettingsModal
+      status={bitrixStatus}
+      onStatusChange={setBitrixStatus}
+      onClose={() => setShowBitrixModal(false)}
+    />
+  );
 
   // Divisão em destaque (prioriza a selecionada manualmente no seletor ou a que está rodando)
   const runningDivisions = divisions.filter((d) => d.isRunning);
@@ -880,7 +1051,7 @@ export const App: React.FC = () => {
   // Modo Mini-Barra Flutuante / Widget Compacto
   if (compactMode) {
     return (
-      <>
+      <BitrixContext.Provider value={bitrixContextValue}>
         <CompactPillView
           projects={projects}
           tasks={tasks}
@@ -898,11 +1069,12 @@ export const App: React.FC = () => {
           onSelectDivision={(id) => setSelectedDivisionId(id)}
         />
         {exitMultiModalNode}
-      </>
+      </BitrixContext.Provider>
     );
   }
 
   return (
+    <BitrixContext.Provider value={bitrixContextValue}>
     <div className="app-shell">
       <TitleBar
         alwaysOnTop={alwaysOnTop}
@@ -917,6 +1089,8 @@ export const App: React.FC = () => {
         onUpdateShortcuts={handleUpdateShortcuts}
         autoLaunch={autoLaunch}
         onToggleAutoLaunch={handleToggleAutoLaunch}
+        bitrixConnected={bitrixStatus.connected}
+        onOpenBitrix={() => setShowBitrixModal(true)}
       />
 
       {/* Destaque Fixo dos Cronômetros Ativos no Topo (mostra 1 ou todos em Multi-Task) */}
@@ -1122,6 +1296,9 @@ export const App: React.FC = () => {
         ) : (
           <HistoryTab
             entries={history}
+            taskLinks={Object.fromEntries(
+              tasks.map((t) => [t.id, t.bitrixTaskId])
+            )}
             onRestoreEntry={handleRestoreHistoryEntry}
             onDeleteEntry={handleDeleteHistoryEntry}
             onClearHistory={handleClearHistory}
@@ -1130,6 +1307,8 @@ export const App: React.FC = () => {
       </main>
 
       {exitMultiModalNode}
+      {bitrixModalNode}
     </div>
+    </BitrixContext.Provider>
   );
 };

@@ -12,6 +12,7 @@ import {
   Keyboard,
   RotateCcw,
   Power,
+  Cloud,
 } from 'lucide-react';
 import { ShortcutConfig } from '../types/timer';
 
@@ -28,6 +29,8 @@ interface TitleBarProps {
   onUpdateShortcuts: (next: ShortcutConfig) => void;
   autoLaunch: boolean;
   onToggleAutoLaunch: () => void;
+  bitrixConnected: boolean;
+  onOpenBitrix: () => void;
 }
 
 const DEFAULT_SHORTCUTS: ShortcutConfig = {
@@ -80,6 +83,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onUpdateShortcuts,
   autoLaunch,
   onToggleAutoLaunch,
+  bitrixConnected,
+  onOpenBitrix,
 }) => {
   const [showOpacityMenu, setShowOpacityMenu] = useState(false);
   const [showShortcutsMenu, setShowShortcutsMenu] = useState(false);
@@ -149,6 +154,20 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         >
           {autoPauseOthers ? <Zap size={14} /> : <Layers size={14} />}
           <span className="btn-tiny-label">{autoPauseOthers ? '1x' : 'Multi'}</span>
+        </button>
+
+        {/* Conexão com o Bitrix24 */}
+        <button
+          type="button"
+          className={`icon-btn bitrix-conn-btn ${bitrixConnected ? 'connected' : ''}`}
+          onClick={onOpenBitrix}
+          title={
+            bitrixConnected
+              ? 'Bitrix24 conectado (clique para gerenciar)'
+              : 'Conectar ao Bitrix24 para lançar tempo nas tarefas'
+          }
+        >
+          <Cloud size={14} />
         </button>
 
         {/* Menu de Atalhos Globais de Teclado */}

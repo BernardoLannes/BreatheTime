@@ -2175,3 +2175,138 @@ button {
   font-size: 12px;
   cursor: pointer;
 }
+
+/* ==================== Integração Bitrix24 ==================== */
+.bitrix-conn-btn.connected {
+  color: var(--accent-green);
+}
+
+.bitrix-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.bitrix-link-btn.linked {
+  color: var(--accent-primary);
+}
+
+.bitrix-id-tag {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.bitrix-log-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.bitrix-log-btn:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.24);
+}
+
+.bitrix-log-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bitrix-log-btn.error {
+  border-color: rgba(251, 113, 133, 0.5);
+  background: rgba(251, 113, 133, 0.14);
+  color: #fb7185;
+}
+
+.bitrix-log-btn.division-log-btn {
+  flex-direction: column;
+  width: 68px;
+  padding: 4px 2px;
+}
+
+.bitrix-log-btn .spin {
+  animation: bitrixSpin 0.9s linear infinite;
+}
+
+@keyframes bitrixSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bitrix-modal {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.bitrix-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.bitrix-tabs button {
+  flex: 1;
+  padding: 5px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.bitrix-tabs button.active {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.bitrix-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bitrix-form input,
+.bitrix-picker-search {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.bitrix-error {
+  margin: 0;
+  font-size: 12px;
+  color: #fb7185;
+}
+
+.bitrix-picker-list {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.exit-multi-option-btn.selected {
+  border-color: var(--accent-primary);
+}
+
+.bitrix-auth-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
