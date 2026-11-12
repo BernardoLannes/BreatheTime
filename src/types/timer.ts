@@ -12,6 +12,8 @@ export interface TaskItem {
   title: string;
   isExpanded: boolean;
   createdAt: number;
+  /** ID da tarefa vinculada no Bitrix24 (opcional) */
+  bitrixTaskId?: number;
 }
 
 export interface TimerDivision {
@@ -24,6 +26,8 @@ export interface TimerDivision {
   description: string;
   /** Tempo acumulado em milissegundos */
   accumulatedMs: number;
+  /** Parte do tempo já lançada no Bitrix24 (ms); só o restante é enviado */
+  loggedMs?: number;
   /** Timestamp (Date.now()) de quando recebeu Play, ou null se pausado */
   startedAt: number | null;
   isRunning: boolean;
@@ -41,6 +45,9 @@ export interface CompletedLogEntry {
   description: string;
   durationMs: number;
   completedAt: number;
+  bitrixTaskId?: number;
+  /** Parte da duração (ms) já lançada no Bitrix24 (evita duplicar) */
+  bitrixLoggedMs?: number;
 }
 
 export interface ShortcutConfig {
@@ -57,9 +64,40 @@ export interface ElectronWindowState {
   autoLaunch: boolean;
 }
 
+export interface BitrixStatus {
+  connected: boolean;
+  portal?: string;
+  user?: { id: number; name: string };
+  /** true quando a credencial está salva sem criptografia (fallback em Linux sem chaveiro) */
+  insecureStorage?: boolean;
+}
+
+export interface BitrixTask {
+  id: number;
+  title: string;
+}
+
+export type BitrixResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; code: string; message: string };
+
+export interface BitrixApi {
+  getStatus: () => Promise<BitrixResult<BitrixStatus>>;
+  login: () => Promise<BitrixResult<BitrixStatus>>;
+  disconnect: () => Promise<BitrixResult<BitrixStatus>>;
+  onOAuthUrl: (callback: (url: string) => void) => () => void;
+  listTasks: () => Promise<BitrixResult<BitrixTask[]>>;
+  logTime: (payload: {
+    taskId: number;
+    seconds: number;
+    comment: string;
+  }) => Promise<BitrixResult<{ seconds: number }>>;
+}
+
 declare global {
   interface Window {
     electronAPI?: {
+      bitrix: BitrixApi;
       getState: () => Promise<ElectronWindowState>;
       toggleAlwaysOnTop: () => Promise<boolean>;
       setCompactMode: (compact?: boolean) => Promise<boolean>;

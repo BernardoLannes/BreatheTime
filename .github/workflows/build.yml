@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            script: dist:win
+            script: dist:win:all
             name: windows
           - os: ubuntu-latest
             script: dist:linux
