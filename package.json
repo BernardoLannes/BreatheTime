@@ -11,7 +11,9 @@
     "dist:exe": "npm run build && node scripts/build-exe.cjs",
     "start": "npm run build && electron .",
     "dist:win": "npm run build && electron-builder --win zip --x64",
-    "dist:win:installer": "npm run build && electron-builder --win nsis --x64"
+    "dist:win:installer": "npm run build && electron-builder --win nsis --x64",
+    "dist:win:all": "npm run build && electron-builder --win --x64 --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --x64 --publish never"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -27,7 +29,10 @@
     "vite": "^5.4.11",
     "wait-on": "^8.0.1"
   },
-  "author": "BreatheTime",
+  "author": {
+    "name": "BreatheTime",
+    "email": "administrador@tedsustentavel.com"
+  },
   "build": {
     "appId": "com.breathetime.app",
     "productName": "BreatheTime",
@@ -62,6 +67,19 @@
       "deleteAppDataOnUninstall": false,
       "artifactName": "BreatheTime-Setup-${version}.${ext}"
     },
-    "artifactName": "BreatheTime-${version}-${arch}.${ext}"
-  }
+    "artifactName": "BreatheTime-${version}-${arch}.${ext}",
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "electron/icon.png",
+      "category": "Utility",
+      "maintainer": "BreatheTime <administrador@tedsustentavel.com>",
+      "artifactName": "BreatheTime-${version}-linux-${arch}.${ext}",
+      "syncDesktopName": true
+    }
+  },
+  "homepage": "https://github.com/RichardFFreitas/BreatheTime",
+  "desktopName": "breathe-time.desktop"
 }
