@@ -11,6 +11,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateShortcuts: (shortcuts) => ipcRenderer.invoke('window:update-shortcuts', shortcuts),
   minimize: () => ipcRenderer.invoke('window:minimize'),
   close: () => ipcRenderer.invoke('window:close'),
+  bitrix: {
+    getStatus: () => ipcRenderer.invoke('bitrix:get-status'),
+    login: () => ipcRenderer.invoke('bitrix:login'),
+    disconnect: () => ipcRenderer.invoke('bitrix:disconnect'),
+    onOAuthUrl: (callback) => {
+      const listener = (_event, url) => callback(url);
+      ipcRenderer.on('bitrix:oauth-url', listener);
+      return () => ipcRenderer.removeListener('bitrix:oauth-url', listener);
+    },
+    listTasks: () => ipcRenderer.invoke('bitrix:list-tasks'),
+    logTime: (payload) => ipcRenderer.invoke('bitrix:log-time', payload),
+  },
   onShortcutTogglePlay: (callback) => {
     const listener = () => callback();
     ipcRenderer.on('shortcut:toggle-play', listener);

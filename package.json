@@ -10,13 +10,8 @@
     "build": "tsc && vite build",
     "dist:exe": "npm run build && node scripts/build-exe.cjs",
     "start": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
-    "dist:linux": "npm run build && electron-builder --linux --x64 --publish never"
-  },
-  "dependencies": {
-    "lucide-react": "^0.460.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "dist:win": "npm run build && electron-builder --win zip --x64",
+    "dist:win:installer": "npm run build && electron-builder --win nsis --x64"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -25,6 +20,9 @@
     "concurrently": "^9.1.0",
     "electron": "^33.2.0",
     "electron-builder": "^26.18.0",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "wait-on": "^8.0.1"
