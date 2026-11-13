@@ -16,14 +16,16 @@ const REQUEST_TIMEOUT_MS = 20 * 1000;
 
 // Aplicativo local do Bitrix24 (fixo). O client_secret fica só no processo main e nunca é enviado ao
 // renderer nem salvo em disco; ainda assim, quem tiver o executável consegue extraí-lo.
+// Segredos vêm de electron/bitrix-secrets.cjs, gerado no build a partir de env/.env (fora do git).
+const secrets = require('./bitrix-secrets.cjs');
 const BITRIX_PORTAL = 'tdsustentavel.bitrix24.com.br';
 const BITRIX_CLIENT_ID = 'local.6af4d0803cba14.88058599';
-const BITRIX_CLIENT_SECRET = 'WP0xtcND36Xdvgk6HyaIxPh2anX5KhaVHAhhe10Dx1XRrTIrbb';
+const BITRIX_CLIENT_SECRET = secrets.BITRIX_CLIENT_SECRET;
 
 // Webhook de entrada fixo, usado para listar as tarefas no seletor de vínculo.
 // Ele age como o usuário que o criou (ID 31977), então a lista é sempre a desse usuário.
-const BITRIX_WEBHOOK_URL = 'https://tdsustentavel.bitrix24.com.br/rest/31977/af132dtkxi0150b8/';
-const BITRIX_WEBHOOK_USER_ID = 31977;
+const BITRIX_WEBHOOK_URL = secrets.BITRIX_WEBHOOK_URL;
+const BITRIX_WEBHOOK_USER_ID = Number(secrets.BITRIX_WEBHOOK_USER_ID);
 
 let config = null; // carregado sob demanda
 let configLoaded = false;
