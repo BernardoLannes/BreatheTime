@@ -22,7 +22,10 @@ import {
   ShortcutConfig,
   ReminderSettings,
   BitrixStatus,
+  ThemeConfig,
 } from './types/timer';
+import { PRESET_THEMES, applyThemeToDocument } from './utils/themes';
+import { ThemeModal } from './components/ThemeModal';
 import {
   getDivisionElapsedMs,
   splitDuration,
@@ -85,6 +88,7 @@ interface StoredState {
   presetLabels: string[];
   unfocusedOpacity?: number;
   reminders?: ReminderSettings;
+  theme?: ThemeConfig;
 }
 
 function getInitialState(): StoredState {
@@ -118,6 +122,7 @@ function getInitialState(): StoredState {
             ...DEFAULT_REMINDERS,
             ...(parsed.reminders || {}),
           },
+          theme: parsed.theme || PRESET_THEMES[0],
         };
       }
     }
@@ -201,6 +206,15 @@ export const App: React.FC = () => {
   );
   const [reminderBanner, setReminderBanner] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [theme, setTheme] = useState<ThemeConfig>(
+    initial.theme || PRESET_THEMES[0]
+  );
+  const [showThemeModal, setShowThemeModal] = useState(false);
+
+  // Aplicar tema e cores personalizáveis no DOM
+  useEffect(() => {
+    applyThemeToDocument(theme);
+  }, [theme]);
 
   // Navegação e UI
   const [activeTab, setActiveTab] = useState<'timers' | 'history'>('timers');
@@ -264,6 +278,7 @@ export const App: React.FC = () => {
       presetLabels,
       unfocusedOpacity: opacity,
       reminders,
+      theme,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
@@ -281,6 +296,7 @@ export const App: React.FC = () => {
     presetLabels,
     opacity,
     reminders,
+    theme,
   ]);
 
   const handleTogglePlayDivision = useCallback(
@@ -302,6 +318,8 @@ export const App: React.FC = () => {
                 ...div,
                 isRunning: true,
                 startedAt: currentTs,
+                firstStartedAt: div.firstStartedAt ?? currentTs,
+                lastActivityAt: currentTs,
               };
             } else {
               const elapsed =
@@ -311,6 +329,7 @@ export const App: React.FC = () => {
                 isRunning: false,
                 accumulatedMs: Math.max(0, div.accumulatedMs + elapsed),
                 startedAt: null,
+                lastActivityAt: currentTs,
               };
             }
           }
@@ -323,6 +342,7 @@ export const App: React.FC = () => {
               isRunning: false,
               accumulatedMs: Math.max(0, div.accumulatedMs + elapsed),
               startedAt: null,
+              lastActivityAt: currentTs,
             };
           }
 
@@ -515,11 +535,18 @@ export const App: React.FC = () => {
       }
     );
 
+    const unsubOpacity = window.electronAPI?.onShortcutOpacityChanged(
+      (nextOp) => {
+        setOpacity(nextOp);
+      }
+    );
+
     return () => {
       unsubPlay?.();
       unsubCompact?.();
       unsubCopy?.();
       unsubAvoid?.();
+      unsubOpacity?.();
     };
   }, [handleTogglePlayDivision]);
 
@@ -788,6 +815,9 @@ export const App: React.FC = () => {
     const project = projects.find((p) => p.id === div.projectId);
 
     if (elapsedMs > 0 || div.description.trim()) {
+      const endTs = div.isRunning ? currentTs : div.lastActivityAt || currentTs;
+      const startTs =
+        div.firstStartedAt || Math.max(0, endTs - elapsedMs);
       const logEntry: CompletedLogEntry = {
         id: generateId('hist'),
         projectId: div.projectId,
@@ -798,7 +828,8 @@ export const App: React.FC = () => {
         divisionLabel: div.label,
         description: div.description,
         durationMs: elapsedMs,
-        completedAt: currentTs,
+        startedAt: startTs,
+        completedAt: endTs,
         bitrixTaskId: task?.bitrixTaskId,
         bitrixLoggedMs: div.loggedMs,
       };
@@ -819,6 +850,8 @@ export const App: React.FC = () => {
                 accumulatedMs: 0,
                 loggedMs: 0,
                 startedAt: null,
+                firstStartedAt: null,
+                lastActivityAt: null,
                 isRunning: false,
               }
             : d
@@ -838,6 +871,9 @@ export const App: React.FC = () => {
     for (const div of taskDivs) {
       const elapsedMs = getDivisionElapsedMs(div, currentTs);
       if (elapsedMs > 0 || div.description.trim()) {
+        const endTs = div.isRunning ? currentTs : div.lastActivityAt || currentTs;
+        const startTs =
+          div.firstStartedAt || Math.max(0, endTs - elapsedMs);
         newEntries.push({
           id: generateId('hist'),
           projectId: div.projectId,
@@ -848,7 +884,8 @@ export const App: React.FC = () => {
           divisionLabel: div.label,
           description: div.description,
           durationMs: elapsedMs,
-          completedAt: currentTs,
+          startedAt: startTs,
+          completedAt: endTs,
           bitrixTaskId: task.bitrixTaskId,
           bitrixLoggedMs: div.loggedMs,
         });
@@ -870,6 +907,8 @@ export const App: React.FC = () => {
           accumulatedMs: 0,
           loggedMs: 0,
           startedAt: null,
+          firstStartedAt: null,
+          lastActivityAt: null,
           isRunning: false,
         },
       ]);
@@ -933,6 +972,15 @@ export const App: React.FC = () => {
     setActiveTab('timers');
   };
 
+  const handleUpdateHistoryEntry = (
+    entryId: string,
+    patch: Partial<Pick<CompletedLogEntry, 'startedAt' | 'completedAt' | 'description'>>
+  ) => {
+    setHistory((prev) =>
+      prev.map((h) => (h.id === entryId ? { ...h, ...patch } : h))
+    );
+  };
+
   const handleDeleteHistoryEntry = (entryId: string) => {
     setHistory((prev) => prev.filter((h) => h.id !== entryId));
   };
@@ -948,12 +996,13 @@ export const App: React.FC = () => {
     );
   };
 
-  /** Envia o tempo ao Bitrix24. Retorna os ms realmente enviados (arredondados a segundos). */
+  /** Envia o tempo ao Bitrix24 na data/hora informada. Retorna os ms realmente enviados. */
   const sendToBitrix = async (
     lockKey: string,
     bitrixTaskId: number | undefined,
     deltaMs: number,
-    comment: string
+    comment: string,
+    createdDate?: number
   ): Promise<{ ok: boolean; message?: string; sentMs?: number }> => {
     if (!window.electronAPI) {
       return { ok: false, message: 'Disponível apenas no aplicativo desktop.' };
@@ -977,6 +1026,7 @@ export const App: React.FC = () => {
         taskId: bitrixTaskId,
         seconds,
         comment,
+        createdDate,
       });
       if (!res.ok) {
         if (res.code === 'auth' || res.code === 'not_connected') {
@@ -999,7 +1049,8 @@ export const App: React.FC = () => {
       `task:${task.id}`,
       task.bitrixTaskId,
       delta,
-      formatDivisionClipboardText(div.label, div.description, task.title)
+      formatDivisionClipboardText(div.label, div.description, task.title),
+      div.isRunning ? Date.now() : div.lastActivityAt || Date.now()
     );
     if (r.ok && r.sentMs) {
       setDivisions((prev) =>
@@ -1052,7 +1103,8 @@ export const App: React.FC = () => {
       `hist:${entryId}`,
       bitrixTaskId,
       delta,
-      formatDivisionClipboardText(entry.divisionLabel, entry.description, entry.taskTitle)
+      formatDivisionClipboardText(entry.divisionLabel, entry.description, entry.taskTitle),
+      entry.completedAt
     );
     if (r.ok && r.sentMs) {
       setHistory((prev) =>
@@ -1100,9 +1152,16 @@ export const App: React.FC = () => {
     (acc, d) => acc + getDivisionElapsedMs(d, now),
     0
   );
-  const totalHistoryMs = history.reduce((acc, h) => acc + h.durationMs, 0);
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartMs = todayStart.getTime();
+  const todayEntries = history.filter((h) => h.completedAt >= todayStartMs);
+  const totalTodayHistoryMs = todayEntries.reduce(
+    (acc, h) => acc + h.durationMs,
+    0
+  );
   const activeTimeSplit = splitDuration(totalActiveMs);
-  const historyTimeSplit = splitDuration(totalHistoryMs);
+  const historyTimeSplit = splitDuration(totalTodayHistoryMs);
 
   // Modal de Saída do Modo Multi-Task
   const exitMultiModalNode = showExitMultiModal && (
@@ -1246,6 +1305,7 @@ export const App: React.FC = () => {
         }}
         bitrixConnected={bitrixStatus.connected}
         onOpenBitrix={() => setShowBitrixModal(true)}
+        onOpenThemeModal={() => setShowThemeModal(true)}
       />
 
       {reminderBanner && (
@@ -1349,10 +1409,10 @@ export const App: React.FC = () => {
             onClick={() => setActiveTab('history')}
           >
             <History size={14} />
-            <span>Histórico do Dia</span>
-            {history.length > 0 && (
+            <span>Histórico</span>
+            {todayEntries.length > 0 && (
               <span className="tab-badge history-badge">
-                {history.length} ({historyTimeSplit.paddedHours}h
+                {todayEntries.length} ({historyTimeSplit.paddedHours}h
                 {historyTimeSplit.paddedMinutes}m)
               </span>
             )}
@@ -1529,6 +1589,7 @@ export const App: React.FC = () => {
               tasks.map((t) => [t.id, t.bitrixTaskId])
             )}
             onRestoreEntry={handleRestoreHistoryEntry}
+            onUpdateEntry={handleUpdateHistoryEntry}
             onDeleteEntry={handleDeleteHistoryEntry}
             onClearHistory={handleClearHistory}
           />
@@ -1537,6 +1598,13 @@ export const App: React.FC = () => {
 
       {exitMultiModalNode}
       {bitrixModalNode}
+      {showThemeModal && (
+        <ThemeModal
+          theme={theme}
+          onChangeTheme={setTheme}
+          onClose={() => setShowThemeModal(false)}
+        />
+      )}
     </div>
     </BitrixContext.Provider>
   );

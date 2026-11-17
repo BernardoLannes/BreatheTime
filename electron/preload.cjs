@@ -45,4 +45,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('shortcut:avoid-mouse-changed', listener);
     return () => ipcRenderer.removeListener('shortcut:avoid-mouse-changed', listener);
   },
+  onShortcutOpacityChanged: (callback) => {
+    const listener = (_event, opacity) => callback(opacity);
+    ipcRenderer.on('shortcut:opacity-changed', listener);
+    return () => ipcRenderer.removeListener('shortcut:opacity-changed', listener);
+  },
 });

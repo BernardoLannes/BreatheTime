@@ -358,7 +358,20 @@ async function listTasks() {
   return [...byId.values()].sort((a, b) => b.id - a.id);
 }
 
-async function logTime({ taskId, seconds, comment }) {
+function formatBitrixIsoDate(tsOrIso) {
+  if (!tsOrIso) return undefined;
+  const d = typeof tsOrIso === 'number' ? new Date(tsOrIso) : new Date(tsOrIso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const pad = (n) => String(n).padStart(2, '0');
+  const offsetMin = -d.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? '+' : '-';
+  const absOff = Math.abs(offsetMin);
+  const offH = pad(Math.floor(absOff / 60));
+  const offM = pad(absOff % 60);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${offH}:${offM}`;
+}
+
+async function logTime({ taskId, seconds, comment, createdDate }) {
   const id = Number(taskId);
   const secs = Math.round(Number(seconds));
   if (!Number.isInteger(id) || id <= 0) {
@@ -367,12 +380,20 @@ async function logTime({ taskId, seconds, comment }) {
   if (!Number.isFinite(secs) || secs <= 0) {
     throw new BitrixError('invalid_input', 'Não há tempo para lançar.');
   }
+  const arfields = {
+    SECONDS: secs,
+    COMMENT_TEXT: String(comment || '').slice(0, 2000),
+  };
+  const isoDate = formatBitrixIsoDate(createdDate);
+  if (isoDate) {
+    arfields.CREATED_DATE = isoDate;
+  }
   // Usa o webhook (que tem o escopo "task"); o tempo fica registrado em nome do dono do webhook
   await callWebhook('task.elapseditem.add', {
     TASKID: id,
-    ARFIELDS: { SECONDS: secs, COMMENT_TEXT: String(comment || '').slice(0, 2000) },
+    ARFIELDS: arfields,
   });
-  return { seconds: secs };
+  return { seconds: secs, createdDate: isoDate };
 }
 
 /** Converte exceções em resultado serializável para o renderer. */

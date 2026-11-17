@@ -30,6 +30,10 @@ export interface TimerDivision {
   loggedMs?: number;
   /** Timestamp (Date.now()) de quando recebeu Play, ou null se pausado */
   startedAt: number | null;
+  /** Timestamp (Date.now()) de quando recebeu Play pela primeira vez neste ciclo */
+  firstStartedAt?: number | null;
+  /** Último instante em que esteve ativo (Play/Pause/Ajuste) */
+  lastActivityAt?: number | null;
   isRunning: boolean;
   createdAt: number;
 }
@@ -44,10 +48,24 @@ export interface CompletedLogEntry {
   divisionLabel: string;
   description: string;
   durationMs: number;
+  /** Timestamp de início da atividade (ou estimado por completedAt - durationMs) */
+  startedAt?: number;
+  /** Timestamp de término / data-hora de referência para lançamento no Bitrix24 */
   completedAt: number;
   bitrixTaskId?: number;
   /** Parte da duração (ms) já lançada no Bitrix24 (evita duplicar) */
   bitrixLoggedMs?: number;
+}
+
+export interface ThemeConfig {
+  id: string;
+  name: string;
+  isLight?: boolean;
+  bgApp: string;
+  bgSurface: string;
+  bgCard: string;
+  accentPrimary: string;
+  accentGreen: string;
 }
 
 export interface ShortcutConfig {
@@ -99,7 +117,8 @@ export interface BitrixApi {
     taskId: number;
     seconds: number;
     comment: string;
-  }) => Promise<BitrixResult<{ seconds: number }>>;
+    createdDate?: string | number;
+  }) => Promise<BitrixResult<{ seconds: number; createdDate?: string }>>;
 }
 
 declare global {
@@ -124,6 +143,9 @@ declare global {
       onShortcutCopyDescription: (callback: () => void) => () => void;
       onShortcutAvoidMouseChanged: (
         callback: (enabled: boolean) => void
+      ) => () => void;
+      onShortcutOpacityChanged: (
+        callback: (opacity: number) => void
       ) => () => void;
     };
   }

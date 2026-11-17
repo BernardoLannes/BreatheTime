@@ -303,6 +303,31 @@ function registerGlobalShortcuts(shortcutsConfig) {
     }
   }
 
+  // Atalhos globais de Opacidade: Alt+Shift++ (ou =) para aumentar, Alt+Shift+- para diminuir
+  const adjustOpacityBy = (delta) => {
+    const next = Math.round(Math.max(0.35, Math.min(1.0, currentOpacity + delta)) * 100) / 100;
+    applyOpacityWithPreview(next);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('shortcut:opacity-changed', next);
+    }
+  };
+
+  for (const accel of ['Alt+Shift+Plus', 'Alt+Shift+=', 'Alt+Shift+numadd']) {
+    try {
+      globalShortcut.register(accel, () => adjustOpacityBy(0.1));
+    } catch {
+      // ignore if key not supported on current layout
+    }
+  }
+
+  for (const accel of ['Alt+Shift+-', 'Alt+Shift+numsub']) {
+    try {
+      globalShortcut.register(accel, () => adjustOpacityBy(-0.1));
+    } catch {
+      // ignore
+    }
+  }
+
   return currentShortcuts;
 }
 
@@ -454,13 +479,11 @@ ipcMain.handle('window:ensure-compact-height', (_event, minHeightNeeded) => {
 
 let opacityPreviewTimer = null;
 
-ipcMain.handle('window:set-opacity', (_event, value) => {
-  if (!mainWindow) return currentOpacity;
+function applyOpacityWithPreview(value) {
+  if (!mainWindow || mainWindow.isDestroyed()) return currentOpacity;
   const clamped = Math.max(0.35, Math.min(1.0, Number(value) || 1.0));
   currentOpacity = clamped;
 
-  // Mostra uma prévia rápida do nível escolhido e, se a janela continuar selecionada (em foco),
-  // volta para 100% até que o usuário clique fora da janela (blur)
   mainWindow.setOpacity(clamped);
   if (opacityPreviewTimer) clearTimeout(opacityPreviewTimer);
   opacityPreviewTimer = setTimeout(() => {
@@ -470,6 +493,10 @@ ipcMain.handle('window:set-opacity', (_event, value) => {
   }, 900);
 
   return currentOpacity;
+}
+
+ipcMain.handle('window:set-opacity', (_event, value) => {
+  return applyOpacityWithPreview(value);
 });
 
 ipcMain.handle('window:update-shortcuts', (_event, newShortcuts) => {

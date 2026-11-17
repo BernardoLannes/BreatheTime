@@ -15,6 +15,7 @@ import {
   Cloud,
   MoveHorizontal,
   Bell,
+  Palette,
 } from 'lucide-react';
 import { ReminderSettings, ShortcutConfig } from '../types/timer';
 
@@ -37,6 +38,7 @@ interface TitleBarProps {
   onUpdateReminders: (next: ReminderSettings) => void;
   bitrixConnected: boolean;
   onOpenBitrix: () => void;
+  onOpenThemeModal: () => void;
 }
 
 const DEFAULT_SHORTCUTS: ShortcutConfig = {
@@ -97,6 +99,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onUpdateReminders,
   bitrixConnected,
   onOpenBitrix,
+  onOpenThemeModal,
 }) => {
   const [showOpacityMenu, setShowOpacityMenu] = useState(false);
   const [showShortcutsMenu, setShowShortcutsMenu] = useState(false);
@@ -212,6 +215,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 >
                   <span className="switch-knob" />
                 </button>
+                <div className="shortcut-row">
+                  <span className="shortcut-label">Opacidade (+ / -)</span>
+                  <span className="shortcut-static-badge">Alt+Shift+ + / -</span>
+                </div>
               </div>
 
               <div className="popover-divider" />
@@ -307,6 +314,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                       : shortcuts.toggleAvoidMouse}
                   </button>
                 </div>
+                <div className="shortcut-row">
+                  <span className="shortcut-label">Opacidade (+ / -)</span>
+                  <span className="shortcut-static-badge">Alt+Shift+ + / -</span>
+                </div>
               </div>
 
               <div className="popover-divider" />
@@ -356,6 +367,16 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Botão Temas & Cores Personalizáveis */}
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onOpenThemeModal}
+          title="Temas e Cores Personalizáveis"
+        >
+          <Palette size={14} />
+        </button>
 
         {/* Controle de Transparência / Opacidade */}
         <div className="opacity-dropdown-wrapper">
