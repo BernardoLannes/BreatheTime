@@ -13,6 +13,8 @@ import {
   X,
 } from 'lucide-react';
 import { TimerDivision } from '../types/timer';
+import { useBitrix } from '../bitrix/BitrixContext';
+import { BitrixLogButton } from './BitrixLogButton';
 import {
   getDivisionElapsedMs,
   splitDuration,
@@ -23,6 +25,7 @@ import {
 interface DivisionRowProps {
   division: TimerDivision;
   taskTitle: string;
+  taskBitrixId?: number;
   isOnlyDivision: boolean;
   now: number;
   presetLabels: string[];
@@ -39,6 +42,7 @@ interface DivisionRowProps {
 export const DivisionRow: React.FC<DivisionRowProps> = ({
   division,
   taskTitle,
+  taskBitrixId,
   isOnlyDivision,
   now,
   presetLabels,
@@ -51,6 +55,7 @@ export const DivisionRow: React.FC<DivisionRowProps> = ({
   onCompleteAndReset,
   onDeleteDivision,
 }) => {
+  const bitrix = useBitrix();
   const [copied, setCopied] = useState(false);
   const [isEditingTime, setIsEditingTime] = useState(false);
   const [editHours, setEditHours] = useState('0');
@@ -435,6 +440,19 @@ export const DivisionRow: React.FC<DivisionRowProps> = ({
             </>
           )}
         </button>
+
+        <BitrixLogButton
+          className="division-log-btn"
+          iconSize={15}
+          onLog={() => bitrix.logDivision(division.id)}
+          disabledReason={
+            !bitrix.status.connected
+              ? 'Conecte-se ao Bitrix24 (ícone de nuvem na barra de título)'
+              : !taskBitrixId
+                ? 'Vincule a tarefa a uma tarefa do Bitrix24 (ícone de link)'
+                : undefined
+          }
+        />
       </div>
     </div>
   );

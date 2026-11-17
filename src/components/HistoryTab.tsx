@@ -8,6 +8,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { CompletedLogEntry } from '../types/timer';
+import { useBitrix } from '../bitrix/BitrixContext';
+import { BitrixLogButton } from './BitrixLogButton';
 import {
   splitDuration,
   formatDivisionClipboardText,
@@ -19,15 +21,19 @@ interface HistoryTabProps {
   onRestoreEntry: (entry: CompletedLogEntry) => void;
   onDeleteEntry: (entryId: string) => void;
   onClearHistory: () => void;
+  /** taskId local → ID da tarefa Bitrix vinculada (para entradas antigas sem vínculo) */
+  taskLinks: Record<string, number | undefined>;
 }
 
 export const HistoryTab: React.FC<HistoryTabProps> = ({
+  taskLinks,
   entries,
   onRestoreEntry,
   onDeleteEntry,
   onClearHistory,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const bitrix = useBitrix();
 
   const totalDayMs = entries.reduce((acc, item) => acc + item.durationMs, 0);
   const totalDay = splitDuration(totalDayMs);
@@ -95,6 +101,9 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
               { hour: '2-digit', minute: '2-digit' }
             );
             const isCopied = copiedId === entry.id;
+            const linkedId = entry.bitrixTaskId ?? taskLinks[entry.taskId];
+            const fullyLogged =
+              (entry.bitrixLoggedMs || 0) >= entry.durationMs - 500;
             const formattedCopyText = formatDivisionClipboardText(
               entry.divisionLabel,
               entry.description,
@@ -153,6 +162,21 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
                     {isCopied ? <Check size={13} /> : <Copy size={13} />}
                     <span>{isCopied ? 'Copiado!' : 'Copiar Descrição'}</span>
                   </button>
+
+                  <BitrixLogButton
+                    className="history-btn"
+                    label={fullyLogged ? 'Lançado' : 'Lançar no Bitrix'}
+                    onLog={() => bitrix.logHistoryEntry(entry.id)}
+                    disabledReason={
+                      fullyLogged
+                        ? 'Este tempo já foi lançado no Bitrix24'
+                        : !bitrix.status.connected
+                          ? 'Conecte-se ao Bitrix24 (ícone de nuvem na barra de título)'
+                          : !linkedId
+                            ? 'Restaure e vincule a tarefa ao Bitrix24 para lançar'
+                            : undefined
+                    }
+                  />
 
                   <button
                     type="button"

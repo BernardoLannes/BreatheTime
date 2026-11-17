@@ -7,8 +7,12 @@ import {
   Check,
   CheckCheck,
   Trash2,
+  Link2,
 } from 'lucide-react';
 import { TaskItem, TimerDivision } from '../types/timer';
+import { useBitrix } from '../bitrix/BitrixContext';
+import { BitrixLogButton } from './BitrixLogButton';
+import { BitrixTaskPicker } from './BitrixTaskPicker';
 import {
   getDivisionElapsedMs,
   splitDuration,
@@ -57,6 +61,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onCompleteAllTaskDivisions,
 }) => {
   const [copiedAll, setCopiedAll] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const bitrix = useBitrix();
 
   const totalTaskMs = divisions.reduce(
     (acc, div) => acc + getDivisionElapsedMs(div, now),
@@ -96,6 +102,20 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           onChange={(e) => onUpdateTaskTitle(task.id, e.target.value)}
           placeholder="Nome da Tarefa do Bitrix24..."
         />
+
+        <button
+          type="button"
+          className={`icon-action-btn bitrix-link-btn ${task.bitrixTaskId ? 'linked' : ''}`}
+          onClick={() => setShowPicker(true)}
+          title={
+            task.bitrixTaskId
+              ? `Vinculada à tarefa #${task.bitrixTaskId} do Bitrix24 (clique para alterar)`
+              : 'Vincular a uma tarefa do Bitrix24'
+          }
+        >
+          <Link2 size={13} />
+          {task.bitrixTaskId && <span className="bitrix-id-tag">#{task.bitrixTaskId}</span>}
+        </button>
 
         {/* Total Somado da Tarefa (destacado em Horas e Minutos para o Bitrix24) */}
         <div
@@ -147,6 +167,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 </button>
               )}
 
+              <BitrixLogButton
+                label="Lançar no Bitrix"
+                onLog={() => bitrix.logTask(task.id)}
+                disabledReason={
+                  !bitrix.status.connected
+                    ? 'Conecte-se ao Bitrix24 (ícone de nuvem na barra de título)'
+                    : !task.bitrixTaskId
+                      ? 'Vincule esta tarefa a uma tarefa do Bitrix24 (ícone de link)'
+                      : undefined
+                }
+              />
+
               {divisions.length > 1 && totalTaskMs > 0 && (
                 <button
                   type="button"
@@ -168,6 +200,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 key={div.id}
                 division={div}
                 taskTitle={task.title}
+                taskBitrixId={task.bitrixTaskId}
                 isOnlyDivision={divisions.length === 1}
                 now={now}
                 presetLabels={presetLabels}
@@ -183,6 +216,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             ))}
           </div>
         </>
+      )}
+      {showPicker && (
+        <BitrixTaskPicker
+          currentId={task.bitrixTaskId}
+          onSelect={(id) => {
+            bitrix.linkTask(task.id, id);
+            setShowPicker(false);
+          }}
+          onClose={() => setShowPicker(false)}
+        />
       )}
     </div>
   );

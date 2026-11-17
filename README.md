@@ -44,3 +44,15 @@ npm run dev
 npm run dist:exe
 ```
 O executável será gerado em `release/BreatheTime/BreatheTime.exe` e um atalho será criado automaticamente no seu Desktop.
+
+## Integração com o Bitrix24
+
+Clique no ícone de nuvem na barra de título e em **Entrar com Bitrix24**. O navegador abre para você
+autorizar (se não abrir, o app mostra o link para copiar). O app usa um aplicativo local do Bitrix24
+fixo no código (`electron/bitrix.cjs`) cuja URL de callback é `http://127.0.0.1:53682/bitrix/callback`.
+Os tokens ficam criptografados (`safeStorage` do Electron) na pasta de dados do app, nunca no `localStorage`.
+
+**Uso**: vincule cada tarefa a uma tarefa do Bitrix (ícone de link; aparecem as abertas em que você é
+responsável, participante ou criador, ou digite o ID). Use **Lançar** na divisão, na tarefa ou no
+histórico para enviar o tempo (`task.elapseditem.add`). Só o tempo ainda não enviado é lançado,
+então clicar duas vezes não duplica.

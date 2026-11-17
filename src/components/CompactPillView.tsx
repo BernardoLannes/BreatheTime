@@ -14,6 +14,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { Project, TaskItem, TimerDivision } from '../types/timer';
+import { useBitrix } from '../bitrix/BitrixContext';
+import { BitrixLogButton } from './BitrixLogButton';
 import {
   getDivisionElapsedMs,
   splitDuration,
@@ -55,6 +57,7 @@ export const CompactPillView: React.FC<CompactPillViewProps> = ({
   onSelectDivision,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const bitrix = useBitrix();
 
   // Lista quais divisões devem aparecer no modo compacto:
   // - Todas as divisões que estão rodando no momento (suporte total a Multi-Task)
@@ -295,6 +298,20 @@ export const CompactPillView: React.FC<CompactPillViewProps> = ({
                       </>
                     )}
                   </button>
+
+                  <BitrixLogButton
+                    className="compact-log-btn"
+                    label="Lançar"
+                    iconSize={13}
+                    onLog={() => bitrix.logDivision(div.id)}
+                    disabledReason={
+                      !bitrix.status.connected
+                        ? 'Conecte-se ao Bitrix24 no painel completo'
+                        : !task?.bitrixTaskId
+                          ? 'Vincule a tarefa ao Bitrix24 no painel completo'
+                          : undefined
+                    }
+                  />
                 </div>
               </div>
             );
