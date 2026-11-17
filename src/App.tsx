@@ -51,8 +51,11 @@ const DEFAULT_SHORTCUTS: ShortcutConfig = {
 };
 
 const DEFAULT_REMINDERS: ReminderSettings = {
-  idleMinutes: 0,
+  idleMinutes: 15,
   breakMinutes: 0,
+  autoPauseIdleMinutes: 10,
+  pauseOnSleepOrLock: true,
+  remindOnResume: true,
 };
 
 const DEFAULT_PRESET_LABELS = [
@@ -262,8 +265,20 @@ export const App: React.FC = () => {
         setOpacity(st.opacity);
       }
       window.electronAPI?.updateShortcuts(initial.shortcuts);
+      window.electronAPI?.setPowerSettings({
+        autoPauseIdleMinutes: reminders.autoPauseIdleMinutes,
+        pauseOnSleepOrLock: reminders.pauseOnSleepOrLock,
+      });
     });
   }, [initial.shortcuts, initial.unfocusedOpacity]);
+
+  // Sincronizar configurações de inatividade/suspensão sempre que o usuário alterar
+  useEffect(() => {
+    window.electronAPI?.setPowerSettings({
+      autoPauseIdleMinutes: reminders.autoPauseIdleMinutes,
+      pauseOnSleepOrLock: reminders.pauseOnSleepOrLock,
+    });
+  }, [reminders.autoPauseIdleMinutes, reminders.pauseOnSleepOrLock]);
 
   // Persistir no localStorage sempre que mudar
   useEffect(() => {
@@ -434,6 +449,7 @@ export const App: React.FC = () => {
   const lastRunningChangeRef = useRef<number>(Date.now());
   const lastIdleNotifiedRef = useRef<number>(0);
   const lastBreakNotifiedRef = useRef<number>(0);
+  const lastAutoPausedIdRef = useRef<string | null>(null);
   const anyRunningNow = divisions.some((d) => d.isRunning);
 
   useEffect(() => {
@@ -442,10 +458,71 @@ export const App: React.FC = () => {
     lastBreakNotifiedRef.current = 0;
     if (anyRunningNow) {
       setReminderBanner((prev) =>
-        prev && prev.includes('parado') ? null : prev
+        prev &&
+        (prev.includes('parado') ||
+          prev.includes('voltou') ||
+          prev.includes('pausado'))
+          ? null
+          : prev
       );
     }
   }, [anyRunningNow]);
+
+  // Escutar eventos do powerMonitor (inatividade do PC, bloqueio, suspensão, desligamento)
+  useEffect(() => {
+    const unsubAutoPause = window.electronAPI?.onPowerAutoPause(
+      ({ reason }) => {
+        const currentDivs = divisionsRef.current;
+        const running = currentDivs.filter((d) => d.isRunning);
+        if (running.length === 0) return;
+
+        lastAutoPausedIdRef.current = running[0].id;
+        const currentTs = Date.now();
+        setNow(currentTs);
+
+        setDivisions((prev) =>
+          prev.map((div) => {
+            if (!div.isRunning) return div;
+            const elapsed =
+              div.startedAt !== null ? currentTs - div.startedAt : 0;
+            return {
+              ...div,
+              isRunning: false,
+              accumulatedMs: Math.max(0, div.accumulatedMs + elapsed),
+              startedAt: null,
+              lastActivityAt: currentTs,
+            };
+          })
+        );
+
+        const msg = `Pausado automaticamente: ${reason}.`;
+        setReminderBanner(msg);
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('BreatheTime — Pausa Automática', { body: msg });
+        }
+      }
+    );
+
+    const unsubResume = window.electronAPI?.onPowerResume(() => {
+      if (!reminders.remindOnResume) return;
+      const currentDivs = divisionsRef.current;
+      const hasRunning = currentDivs.some((d) => d.isRunning);
+      if (hasRunning || currentDivs.length === 0) return;
+
+      const msg = 'Você voltou ao PC — quer retomar seu cronômetro?';
+      setReminderBanner(msg);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('BreatheTime — Lembrar de Ligar o Tempo', {
+          body: msg,
+        });
+      }
+    });
+
+    return () => {
+      unsubAutoPause?.();
+      unsubResume?.();
+    };
+  }, [reminders.remindOnResume]);
 
   useEffect(() => {
     if (reminders.idleMinutes <= 0 && reminders.breakMinutes <= 0) return;
@@ -1314,13 +1391,36 @@ export const App: React.FC = () => {
             <Bell size={13} />
             <span>{reminderBanner}</span>
           </div>
-          <button
-            type="button"
-            className="reminder-toast-close"
-            onClick={() => setReminderBanner(null)}
-          >
-            <X size={13} />
-          </button>
+          <div className="reminder-toast-actions">
+            {!anyRunningNow && divisions.length > 0 && (
+              <button
+                type="button"
+                className="reminder-resume-btn"
+                onClick={() => {
+                  const targetId =
+                    lastAutoPausedIdRef.current &&
+                    divisions.some((d) => d.id === lastAutoPausedIdRef.current)
+                      ? lastAutoPausedIdRef.current
+                      : selectedDivisionId &&
+                          divisions.some((d) => d.id === selectedDivisionId)
+                        ? selectedDivisionId
+                        : divisions[0].id;
+                  handleTogglePlayDivision(targetId);
+                  setReminderBanner(null);
+                }}
+              >
+                <Play size={11} />
+                <span>Retomar</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="reminder-toast-close"
+              onClick={() => setReminderBanner(null)}
+            >
+              <X size={13} />
+            </button>
+          </div>
         </div>
       )}
 

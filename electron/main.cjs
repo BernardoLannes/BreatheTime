@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, shell, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { registerBitrixIpc } = require('./bitrix.cjs');
@@ -11,6 +11,50 @@ let isTransitioningMode = false;
 let avoidMouseEnabled = false;
 let avoidMouseInterval = null;
 let lastDodgeAt = 0;
+
+let powerSettings = {
+  autoPauseIdleMinutes: 10,
+  pauseOnSleepOrLock: true,
+};
+let idleTriggeredForCurrentStretch = false;
+let idleMonitorInterval = null;
+
+function startIdleMonitor() {
+  if (idleMonitorInterval) return;
+  idleMonitorInterval = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (!powerSettings.autoPauseIdleMinutes || powerSettings.autoPauseIdleMinutes <= 0) {
+      idleTriggeredForCurrentStretch = false;
+      return;
+    }
+    try {
+      const idleSecs = powerMonitor.getSystemIdleTime();
+      if (idleSecs < 10) {
+        idleTriggeredForCurrentStretch = false;
+        return;
+      }
+      if (
+        !idleTriggeredForCurrentStretch &&
+        idleSecs >= powerSettings.autoPauseIdleMinutes * 60
+      ) {
+        idleTriggeredForCurrentStretch = true;
+        mainWindow.webContents.send('power:auto-pause', {
+          reason: `Sem atividade no PC há ${powerSettings.autoPauseIdleMinutes} min`,
+          idleSeconds: idleSecs,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, 5000);
+}
+
+function stopIdleMonitor() {
+  if (idleMonitorInterval) {
+    clearInterval(idleMonitorInterval);
+    idleMonitorInterval = null;
+  }
+}
 
 function getStartupExePath() {
   // Se estiver rodando do BreatheTime.exe empacotado, usa o próprio process.execPath
@@ -426,7 +470,20 @@ ipcMain.handle('window:get-state', () => {
     shortcuts: currentShortcuts,
     autoLaunch: getAutoLaunchEnabled(),
     avoidMouse: avoidMouseEnabled,
+    powerSettings,
   };
+});
+
+ipcMain.handle('window:set-power-settings', (_event, next) => {
+  powerSettings = {
+    autoPauseIdleMinutes: Math.max(0, Number(next?.autoPauseIdleMinutes) || 0),
+    pauseOnSleepOrLock:
+      typeof next?.pauseOnSleepOrLock === 'boolean'
+        ? next.pauseOnSleepOrLock
+        : powerSettings.pauseOnSleepOrLock,
+  };
+  idleTriggeredForCurrentStretch = false;
+  return powerSettings;
 });
 
 ipcMain.handle('window:set-avoid-mouse', (_event, enabled) => {
@@ -516,6 +573,27 @@ registerBitrixIpc(ipcMain);
 app.whenReady().then(() => {
   createWindow();
   registerGlobalShortcuts(currentShortcuts);
+  startIdleMonitor();
+
+  const sendPauseEvent = (reason) => {
+    if (!powerSettings.pauseOnSleepOrLock) return;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('power:auto-pause', { reason, idleSeconds: 0 });
+    }
+  };
+
+  powerMonitor.on('suspend', () => sendPauseEvent('Computador entrou em suspensão'));
+  powerMonitor.on('lock-screen', () => sendPauseEvent('Tela do Windows bloqueada'));
+  powerMonitor.on('shutdown', () => sendPauseEvent('Computador sendo desligado'));
+
+  const sendResumeEvent = () => {
+    idleTriggeredForCurrentStretch = false;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('power:resume');
+    }
+  };
+  powerMonitor.on('resume', sendResumeEvent);
+  powerMonitor.on('unlock-screen', sendResumeEvent);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -523,6 +601,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  stopIdleMonitor();
   stopAvoidMouseLoop();
   globalShortcut.unregisterAll();
 });

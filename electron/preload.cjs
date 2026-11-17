@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setOpacity: (opacity) => ipcRenderer.invoke('window:set-opacity', opacity),
   setAutoLaunch: (enabled) => ipcRenderer.invoke('window:set-auto-launch', enabled),
   setAvoidMouse: (enabled) => ipcRenderer.invoke('window:set-avoid-mouse', enabled),
+  setPowerSettings: (settings) =>
+    ipcRenderer.invoke('window:set-power-settings', settings),
   openExternal: (url) => ipcRenderer.invoke('window:open-external', url),
   updateShortcuts: (shortcuts) => ipcRenderer.invoke('window:update-shortcuts', shortcuts),
   minimize: () => ipcRenderer.invoke('window:minimize'),
@@ -51,5 +53,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = (_event, opacity) => callback(opacity);
     ipcRenderer.on('shortcut:opacity-changed', listener);
     return () => ipcRenderer.removeListener('shortcut:opacity-changed', listener);
+  },
+  onPowerAutoPause: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on('power:auto-pause', listener);
+    return () => ipcRenderer.removeListener('power:auto-pause', listener);
+  },
+  onPowerResume: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('power:resume', listener);
+    return () => ipcRenderer.removeListener('power:resume', listener);
   },
 });

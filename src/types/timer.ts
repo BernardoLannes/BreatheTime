@@ -77,8 +77,11 @@ export interface ShortcutConfig {
 }
 
 export interface ReminderSettings {
-  idleMinutes: number; // 0 = desativado
-  breakMinutes: number; // 0 = desativado
+  idleMinutes: number; // 0 = desativado (lembrete de ligar o tempo)
+  breakMinutes: number; // 0 = desativado (lembrete de pausa contínua)
+  autoPauseIdleMinutes: number; // 0 = desativado (pausar se PC ficar inativo)
+  pauseOnSleepOrLock: boolean; // pausar ao bloquear tela / suspender / desligar
+  remindOnResume: boolean; // lembrar ao desbloquear / voltar da suspensão
 }
 
 export interface ElectronWindowState {
@@ -135,6 +138,10 @@ declare global {
       setOpacity: (opacity: number) => Promise<number>;
       setAutoLaunch: (enabled: boolean) => Promise<boolean>;
       setAvoidMouse: (enabled: boolean) => Promise<boolean>;
+      setPowerSettings: (settings: {
+        autoPauseIdleMinutes: number;
+        pauseOnSleepOrLock: boolean;
+      }) => Promise<{ autoPauseIdleMinutes: number; pauseOnSleepOrLock: boolean }>;
       openExternal: (url: string) => Promise<void>;
       updateShortcuts: (shortcuts: ShortcutConfig) => Promise<ShortcutConfig>;
       minimize: () => Promise<void>;
@@ -150,6 +157,10 @@ declare global {
       onShortcutOpacityChanged: (
         callback: (opacity: number) => void
       ) => () => void;
+      onPowerAutoPause: (
+        callback: (payload: { reason: string; idleSeconds: number }) => void
+      ) => () => void;
+      onPowerResume: (callback: () => void) => () => void;
     };
   }
 }

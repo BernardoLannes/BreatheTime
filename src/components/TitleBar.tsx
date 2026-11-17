@@ -325,10 +325,63 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               <div className="reminders-section">
                 <div className="reminders-header">
                   <Bell size={12} className="bell-icon" />
-                  <span>Lembretes de Produtividade</span>
+                  <span>Proteção & Lembretes</span>
                 </div>
+
                 <div className="reminder-row">
-                  <span>Avisar se parado por:</span>
+                  <span>Pausar se PC inativo por:</span>
+                  <select
+                    className="reminder-select"
+                    value={reminders.autoPauseIdleMinutes}
+                    onChange={(e) =>
+                      onUpdateReminders({
+                        ...reminders,
+                        autoPauseIdleMinutes: Number(e.target.value),
+                      })
+                    }
+                  >
+                    <option value={0}>Desativado</option>
+                    <option value={5}>5 min</option>
+                    <option value={10}>10 min</option>
+                    <option value={15}>15 min</option>
+                    <option value={30}>30 min</option>
+                  </select>
+                </div>
+
+                <div className="reminder-row">
+                  <span>Pausar ao bloquear/desligar:</span>
+                  <button
+                    type="button"
+                    className={`switch-pill ${reminders.pauseOnSleepOrLock ? 'on' : 'off'}`}
+                    onClick={() =>
+                      onUpdateReminders({
+                        ...reminders,
+                        pauseOnSleepOrLock: !reminders.pauseOnSleepOrLock,
+                      })
+                    }
+                  >
+                    <span className="switch-knob" />
+                  </button>
+                </div>
+
+                <div className="reminder-row">
+                  <span>Lembrar ao voltar ao PC:</span>
+                  <button
+                    type="button"
+                    className={`switch-pill ${reminders.remindOnResume ? 'on' : 'off'}`}
+                    onClick={() =>
+                      onUpdateReminders({
+                        ...reminders,
+                        remindOnResume: !reminders.remindOnResume,
+                      })
+                    }
+                  >
+                    <span className="switch-knob" />
+                  </button>
+                </div>
+
+                <div className="reminder-row">
+                  <span>Lembrar ligar se parado:</span>
                   <select
                     className="reminder-select"
                     value={reminders.idleMinutes}
@@ -340,11 +393,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     }
                   >
                     <option value={0}>Desativado</option>
+                    <option value={5}>5 min</option>
                     <option value={10}>10 min</option>
                     <option value={15}>15 min</option>
                     <option value={30}>30 min</option>
                   </select>
                 </div>
+
                 <div className="reminder-row">
                   <span>Lembrete de pausa após:</span>
                   <select
