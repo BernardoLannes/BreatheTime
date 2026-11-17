@@ -13,6 +13,8 @@ import {
   Layers,
   Zap,
   MoveHorizontal,
+  Bell,
+  X,
 } from 'lucide-react';
 import { Project, TaskItem, TimerDivision } from '../types/timer';
 import { useBitrix } from '../bitrix/BitrixContext';
@@ -41,6 +43,10 @@ interface CompactPillViewProps {
   onAdjustTimeMs: (divisionId: string, deltaMs: number) => void;
   onUpdateDescription: (divisionId: string, description: string) => void;
   onSelectDivision: (divisionId: string) => void;
+  reminderBanner?: string | null;
+  canResumeFromReminder?: boolean;
+  onResumeFromReminder?: () => void;
+  onDismissReminder?: () => void;
 }
 
 export const CompactPillView: React.FC<CompactPillViewProps> = ({
@@ -60,6 +66,10 @@ export const CompactPillView: React.FC<CompactPillViewProps> = ({
   onAdjustTimeMs,
   onUpdateDescription,
   onSelectDivision,
+  reminderBanner,
+  canResumeFromReminder,
+  onResumeFromReminder,
+  onDismissReminder,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const bitrix = useBitrix();
@@ -78,12 +88,13 @@ export const CompactPillView: React.FC<CompactPillViewProps> = ({
     return running;
   }, [divisions, activeDivision]);
 
-  // Garante altura confortável quando há múltiplos cronômetros visíveis no modo compacto
+  // Garante altura confortável quando há múltiplos cronômetros ou lembrete visível no modo compacto
   useEffect(() => {
     const count = Math.max(1, displayedDivisions.length);
-    const neededHeight = 50 + count * 108;
+    const bannerExtra = reminderBanner ? 42 : 0;
+    const neededHeight = 50 + bannerExtra + count * 108;
     window.electronAPI?.ensureCompactHeight(neededHeight);
-  }, [displayedDivisions.length]);
+  }, [displayedDivisions.length, reminderBanner]);
 
   const handleCopy = async (div: TimerDivision, taskTitle: string) => {
     const text = formatDivisionClipboardText(
@@ -212,6 +223,37 @@ export const CompactPillView: React.FC<CompactPillViewProps> = ({
           </button>
         </div>
       </header>
+
+      {/* Banner de Lembrete / Pausa Automática visível também no Modo Compacto */}
+      {reminderBanner && (
+        <div className="reminder-toast-banner compact-reminder no-drag">
+          <div className="reminder-toast-left">
+            <Bell size={13} />
+            <span>{reminderBanner}</span>
+          </div>
+          <div className="reminder-toast-actions">
+            {canResumeFromReminder && onResumeFromReminder && (
+              <button
+                type="button"
+                className="reminder-resume-btn"
+                onClick={onResumeFromReminder}
+              >
+                <Play size={11} />
+                <span>Retomar</span>
+              </button>
+            )}
+            {onDismissReminder && (
+              <button
+                type="button"
+                className="reminder-toast-close"
+                onClick={onDismissReminder}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Lista de Cronômetros no Modo Compacto (1 ou vários em Multi-Task) */}
       <div className="compact-cards-list no-drag">

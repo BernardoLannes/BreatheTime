@@ -142,6 +142,7 @@ declare global {
         autoPauseIdleMinutes: number;
         pauseOnSleepOrLock: boolean;
       }) => Promise<{ autoPauseIdleMinutes: number; pauseOnSleepOrLock: boolean }>;
+      notify: (title: string, body: string) => Promise<boolean>;
       openExternal: (url: string) => Promise<void>;
       updateShortcuts: (shortcuts: ShortcutConfig) => Promise<ShortcutConfig>;
       minimize: () => Promise<void>;

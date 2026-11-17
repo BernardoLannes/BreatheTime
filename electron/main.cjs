@@ -1,7 +1,12 @@
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, shell, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, shell, powerMonitor, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { registerBitrixIpc } = require('./bitrix.cjs');
+
+// Necessário no Windows para exibir notificações nativas (Toast) com nome e ícone do app
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.breathetime.app');
+}
 
 let mainWindow = null;
 let isAlwaysOnTop = true;
@@ -488,6 +493,35 @@ ipcMain.handle('window:set-power-settings', (_event, next) => {
 
 ipcMain.handle('window:set-avoid-mouse', (_event, enabled) => {
   return setAvoidMouse(enabled);
+});
+
+function showWindowsNotification(title, body) {
+  try {
+    if (!Notification.isSupported()) return false;
+    const notif = new Notification({
+      title: String(title || 'BreatheTime'),
+      body: String(body || ''),
+      icon: path.join(__dirname, 'icon.png'),
+      urgency: 'normal',
+    });
+    notif.on('click', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        if (!mainWindow.isVisible()) mainWindow.show();
+        if (isAlwaysOnTop) mainWindow.setAlwaysOnTop(true, 'floating');
+        mainWindow.focus();
+      }
+    });
+    notif.show();
+    return true;
+  } catch (e) {
+    console.error('Failed to show notification:', e);
+    return false;
+  }
+}
+
+ipcMain.handle('window:notify', (_event, { title, body }) => {
+  return showWindowsNotification(title, body);
 });
 
 ipcMain.handle('window:open-external', (_event, rawUrl) => {

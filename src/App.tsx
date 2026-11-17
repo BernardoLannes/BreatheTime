@@ -477,6 +477,28 @@ export const App: React.FC = () => {
     }
   }, [anyRunningNow]);
 
+  const sendSystemNotification = useCallback((title: string, body: string) => {
+    if (window.electronAPI?.notify) {
+      window.electronAPI.notify(title, body);
+    } else if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body });
+    }
+  }, []);
+
+  const handleResumeFromReminder = useCallback(() => {
+    if (divisions.length === 0) return;
+    const targetId =
+      lastAutoPausedIdRef.current &&
+      divisions.some((d) => d.id === lastAutoPausedIdRef.current)
+        ? lastAutoPausedIdRef.current
+        : selectedDivisionId &&
+            divisions.some((d) => d.id === selectedDivisionId)
+          ? selectedDivisionId
+          : divisions[0].id;
+    handleTogglePlayDivision(targetId);
+    setReminderBanner(null);
+  }, [divisions, selectedDivisionId, handleTogglePlayDivision]);
+
   // Escutar eventos do powerMonitor (inatividade do PC, bloqueio, suspensão, desligamento)
   useEffect(() => {
     const unsubAutoPause = window.electronAPI?.onPowerAutoPause(
@@ -506,9 +528,7 @@ export const App: React.FC = () => {
 
         const msg = `Pausado automaticamente: ${reason}.`;
         setReminderBanner(msg);
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('BreatheTime — Pausa Automática', { body: msg });
-        }
+        sendSystemNotification('BreatheTime — Pausa Automática', msg);
       }
     );
 
@@ -520,18 +540,14 @@ export const App: React.FC = () => {
 
       const msg = 'Você voltou ao PC — quer retomar seu cronômetro?';
       setReminderBanner(msg);
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('BreatheTime — Lembrar de Ligar o Tempo', {
-          body: msg,
-        });
-      }
+      sendSystemNotification('BreatheTime — Lembrar de Ligar o Tempo', msg);
     });
 
     return () => {
       unsubAutoPause?.();
       unsubResume?.();
     };
-  }, [reminders.remindOnResume]);
+  }, [reminders.remindOnResume, sendSystemNotification]);
 
   useEffect(() => {
     if (reminders.idleMinutes <= 0 && reminders.breakMinutes <= 0) return;
@@ -548,9 +564,7 @@ export const App: React.FC = () => {
           lastIdleNotifiedRef.current = current;
           const msg = `Nenhum cronômetro ativo há ${reminders.idleMinutes} min.`;
           setReminderBanner(msg);
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('BreatheTime — Lembrete', { body: msg });
-          }
+          sendSystemNotification('BreatheTime — Lembrete de Tempo', msg);
         }
       }
 
@@ -562,15 +576,13 @@ export const App: React.FC = () => {
           lastBreakNotifiedRef.current = current;
           const msg = `Você está cronometrando há ${reminders.breakMinutes} min seguidos. Que tal uma pausa?`;
           setReminderBanner(msg);
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('BreatheTime — Hora da Pausa', { body: msg });
-          }
+          sendSystemNotification('BreatheTime — Hora da Pausa', msg);
         }
       }
     }, 15000);
 
     return () => clearInterval(timer);
-  }, [anyRunningNow, reminders.idleMinutes, reminders.breakMinutes]);
+  }, [anyRunningNow, reminders.idleMinutes, reminders.breakMinutes, sendSystemNotification]);
 
   useEffect(() => {
     const unsubPlay = window.electronAPI?.onShortcutTogglePlay(() => {
@@ -1359,6 +1371,10 @@ export const App: React.FC = () => {
           onAdjustTimeMs={handleAdjustDivisionTimeMs}
           onUpdateDescription={handleUpdateDivisionDescription}
           onSelectDivision={(id) => setSelectedDivisionId(id)}
+          reminderBanner={reminderBanner}
+          canResumeFromReminder={!anyRunningNow && divisions.length > 0}
+          onResumeFromReminder={handleResumeFromReminder}
+          onDismissReminder={() => setReminderBanner(null)}
         />
         {exitMultiModalNode}
       </BitrixContext.Provider>
@@ -1392,18 +1408,7 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 className="reminder-resume-btn"
-                onClick={() => {
-                  const targetId =
-                    lastAutoPausedIdRef.current &&
-                    divisions.some((d) => d.id === lastAutoPausedIdRef.current)
-                      ? lastAutoPausedIdRef.current
-                      : selectedDivisionId &&
-                          divisions.some((d) => d.id === selectedDivisionId)
-                        ? selectedDivisionId
-                        : divisions[0].id;
-                  handleTogglePlayDivision(targetId);
-                  setReminderBanner(null);
-                }}
+                onClick={handleResumeFromReminder}
               >
                 <Play size={11} />
                 <span>Retomar</span>

@@ -423,6 +423,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <option value={120}>2 horas</option>
                   </select>
                 </div>
+
+                <div className="settings-backup-row" style={{ marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary-sm"
+                    onClick={() =>
+                      window.electronAPI?.notify(
+                        'BreatheTime — Teste de Notificação',
+                        'As notificações nativas do Windows estão funcionando!'
+                      )
+                    }
+                  >
+                    <Bell size={12} />
+                    <span>Testar Notificação do Windows</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

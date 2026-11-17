@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setAvoidMouse: (enabled) => ipcRenderer.invoke('window:set-avoid-mouse', enabled),
   setPowerSettings: (settings) =>
     ipcRenderer.invoke('window:set-power-settings', settings),
+  notify: (title, body) => ipcRenderer.invoke('window:notify', { title, body }),
   openExternal: (url) => ipcRenderer.invoke('window:open-external', url),
   updateShortcuts: (shortcuts) => ipcRenderer.invoke('window:update-shortcuts', shortcuts),
   minimize: () => ipcRenderer.invoke('window:minimize'),

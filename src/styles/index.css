@@ -3164,3 +3164,20 @@ button {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Alta visibilidade para o banner de lembretes (modo completo e compacto) */
+.reminder-toast-banner {
+  background: #f59e0b;
+  color: #1c1917;
+  border-bottom: 1px solid #d97706;
+  font-weight: 700;
+}
+
+.reminder-toast-close {
+  color: #1c1917;
+}
+
+.reminder-toast-banner.compact-reminder {
+  padding: 5px 10px;
+  font-size: 11px;
+}
