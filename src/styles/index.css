@@ -15,8 +15,8 @@
   --accent-primary-bg: rgba(56, 189, 248, 0.14);
   --accent-primary-border: rgba(56, 189, 248, 0.35);
   --accent-green: #10b981;
-  --accent-green-bg: rgba(16, 185, 129, 0.14);
-  --accent-green-border: rgba(16, 185, 129, 0.42);
+  --accent-green-bg: var(--accent-green-bg);
+  --accent-green-border: var(--accent-green-bg);
   --accent-amber: #f59e0b;
   --accent-danger: #f43f5e;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -98,9 +98,9 @@ button {
 }
 
 .app-logo.is-running {
-  background: rgba(16, 185, 129, 0.2);
+  background: var(--accent-green-bg);
   color: var(--accent-green);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 0 10px var(--accent-green-bg);
 }
 
 .app-title {
@@ -127,14 +127,14 @@ button {
   height: 7px;
   border-radius: 50%;
   background-color: var(--accent-green);
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  box-shadow: 0 0 0 0 var(--accent-green-bg);
   animation: pulseGlow 1.6s infinite;
   flex-shrink: 0;
 }
 
 @keyframes pulseGlow {
   0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    box-shadow: 0 0 0 0 var(--accent-green-bg);
   }
   70% {
     box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
@@ -236,7 +236,7 @@ button {
 
 .switch-pill.on .switch-knob {
   transform: translateX(16px);
-  background: #34d399;
+  background: var(--accent-green-text);
 }
 
 .popover-divider {
@@ -251,9 +251,9 @@ button {
 }
 
 .icon-btn.multi-active {
-  background: rgba(245, 158, 11, 0.16);
-  border-color: rgba(245, 158, 11, 0.35);
-  color: #fbbf24;
+  background: var(--accent-multi-bg);
+  border-color: var(--accent-multi-border);
+  color: var(--accent-multi);
 }
 
 .btn-tiny-label {
@@ -431,7 +431,7 @@ button {
   gap: 8px;
   padding: 7px 12px;
   background: linear-gradient(90deg, var(--accent-green-bg) 0%, var(--bg-surface) 100%);
-  border-bottom: 1px solid rgba(16, 185, 129, 0.35);
+  border-bottom: 1px solid var(--accent-green-bg);
   flex-shrink: 0;
 }
 
@@ -826,7 +826,7 @@ button {
 
 .task-card.task-running {
   border-color: var(--accent-green-border);
-  box-shadow: 0 0 14px rgba(16, 185, 129, 0.08);
+  box-shadow: 0 0 14px var(--accent-green-bg);
 }
 
 .task-card-header {
@@ -1001,7 +1001,7 @@ button {
 .play-btn.running {
   background: var(--accent-green);
   color: var(--text-on-green);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 12px var(--accent-green-bg);
 }
 
 .time-control-group {
@@ -1180,7 +1180,7 @@ button {
   padding: 4px 7px;
   border-radius: 5px;
   border: 1px solid var(--accent-green-border);
-  background: rgba(16, 185, 129, 0.1);
+  background: var(--accent-green-bg);
   color: var(--accent-green-text);
   font-size: 11px;
   font-weight: 600;
@@ -1495,7 +1495,7 @@ button {
 .compact-logo.running {
   background: var(--accent-green-bg);
   color: var(--accent-green-text);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 8px var(--accent-green-bg);
 }
 
 .compact-selector-wrap {
@@ -1703,7 +1703,7 @@ button {
 .compact-play-btn.running {
   background: var(--accent-green);
   color: var(--text-on-green);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 10px var(--accent-green-bg);
 }
 
 .compact-card-bottom {
@@ -1912,7 +1912,7 @@ button {
   gap: 3px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(16, 185, 129, 0.2);
+  background: var(--accent-green-bg);
   color: var(--accent-green-text);
   font-size: 10.5px;
   font-weight: 700;
@@ -2208,7 +2208,7 @@ button {
   gap: 5px;
   padding: 4px 9px;
   border-radius: 6px;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  border: 1px solid var(--accent-green-bg);
   background: var(--accent-green-bg);
   color: var(--accent-green-text);
   font-size: 11px;
@@ -2478,13 +2478,13 @@ button {
 }
 
 .bitrix-log-complete-btn {
-  border-color: rgba(16, 185, 129, 0.4) !important;
-  background: rgba(16, 185, 129, 0.14) !important;
-  color: #34d399 !important;
+  border-color: var(--accent-green-bg) !important;
+  background: var(--accent-green-bg) !important;
+  color: var(--accent-green-text) !important;
 }
 
 .bitrix-log-complete-btn:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.25) !important;
+  background: var(--accent-green-bg) !important;
 }
 
 /* Resumo por Projeto no Histórico */
@@ -2949,4 +2949,34 @@ button {
   font-size: 11px;
   font-weight: 700;
   color: var(--text-secondary);
+}
+
+/* ==================== REFINO ESTADO RODANDO (CLARO & ESCURO) ==================== */
+.division-card.is-running {
+  background: var(--bg-surface);
+  border-color: var(--accent-green-border);
+  border-left: 3px solid var(--accent-green);
+  box-shadow: 0 2px 10px var(--accent-green-bg);
+}
+
+.compact-timer-card.is-running {
+  background: var(--bg-surface);
+  border-color: var(--accent-green-border);
+  border-left: 3px solid var(--accent-green);
+  box-shadow: 0 3px 12px var(--accent-green-bg);
+}
+
+.active-running-banner {
+  background: var(--bg-surface);
+  border-left: 3px solid var(--accent-green);
+  border-bottom: 1px solid var(--accent-green-border);
+}
+
+:root[data-theme-mode="dark"] .division-card.is-running,
+:root[data-theme-mode="dark"] .compact-timer-card.is-running {
+  background: linear-gradient(135deg, var(--accent-green-bg) 0%, var(--bg-surface) 65%);
+}
+
+:root[data-theme-mode="dark"] .active-running-banner {
+  background: linear-gradient(90deg, var(--accent-green-bg) 0%, var(--bg-surface) 75%);
 }

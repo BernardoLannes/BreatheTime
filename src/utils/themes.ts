@@ -13,85 +13,95 @@ export const PRESET_THEMES: ThemeConfig[] = [
     accentGreen: '#10b981',
   },
   {
-    id: 'emerald-forest',
-    name: 'Emerald Forest',
+    id: 'cyber-neon',
+    name: 'Cyber Neon',
     isLight: false,
-    bgApp: '#071310',
-    bgSurface: '#0d1f1a',
-    bgCard: '#152e27',
-    accentPrimary: '#34d399',
+    bgApp: '#09090b',
+    bgSurface: '#131317',
+    bgCard: '#1d1d24',
+    accentPrimary: '#ec4899',
+    accentGreen: '#06b6d4',
+  },
+  {
+    id: 'dracula-plum',
+    name: 'Dracula Plum',
+    isLight: false,
+    bgApp: '#191626',
+    bgSurface: '#221e33',
+    bgCard: '#2d2844',
+    accentPrimary: '#c084fc',
+    accentGreen: '#34d399',
+  },
+  {
+    id: 'solar-gold',
+    name: 'Solar Gold',
+    isLight: false,
+    bgApp: '#14110e',
+    bgSurface: '#1f1a15',
+    bgCard: '#2c251d',
+    accentPrimary: '#f59e0b',
     accentGreen: '#22c55e',
   },
   {
-    id: 'amethyst-dusk',
-    name: 'Amethyst Dusk',
+    id: 'nordic-frost',
+    name: 'Nordic Frost',
     isLight: false,
-    bgApp: '#110b1f',
-    bgSurface: '#1a122e',
-    bgCard: '#261b42',
-    accentPrimary: '#a78bfa',
-    accentGreen: '#34d399',
-  },
-  {
-    id: 'sunset-amber',
-    name: 'Sunset Amber',
-    isLight: false,
-    bgApp: '#16100c',
-    bgSurface: '#211812',
-    bgCard: '#30231a',
-    accentPrimary: '#f59e0b',
-    accentGreen: '#10b981',
-  },
-  {
-    id: 'rose-noir',
-    name: 'Rose Noir',
-    isLight: false,
-    bgApp: '#140b12',
-    bgSurface: '#1f111c',
-    bgCard: '#2e1929',
-    accentPrimary: '#fb7185',
-    accentGreen: '#34d399',
+    bgApp: '#1d232e',
+    bgSurface: '#242b38',
+    bgCard: '#2e3748',
+    accentPrimary: '#88c0d0',
+    accentGreen: '#a3be8c',
   },
 
   // ==================== TEMAS CLAROS ====================
   {
-    id: 'clean-slate',
-    name: 'Clean Slate',
+    id: 'clean-studio',
+    name: 'Clean Studio',
     isLight: true,
-    bgApp: '#eef2f6',
+    bgApp: '#e8eef5',
     bgSurface: '#ffffff',
-    bgCard: '#f8fafc',
-    accentPrimary: '#0284c7',
+    bgCard: '#f4f7fb',
+    accentPrimary: '#2563eb',
     accentGreen: '#059669',
   },
   {
-    id: 'warm-paper',
-    name: 'Warm Paper',
+    id: 'matcha-latte',
+    name: 'Matcha Latte',
     isLight: true,
-    bgApp: '#f5f0e6',
-    bgSurface: '#fffdf9',
-    bgCard: '#faf5eb',
-    accentPrimary: '#d97706',
-    accentGreen: '#059669',
+    bgApp: '#e3ede5',
+    bgSurface: '#f9fcf9',
+    bgCard: '#edf5ee',
+    accentPrimary: '#15803d',
+    accentGreen: '#0d9488',
   },
   {
-    id: 'mint-breeze',
-    name: 'Mint Breeze',
+    id: 'peach-terracotta',
+    name: 'Terracotta',
     isLight: true,
-    bgApp: '#e8f4f0',
-    bgSurface: '#ffffff',
-    bgCard: '#f2faf7',
-    accentPrimary: '#0d9488',
-    accentGreen: '#16a34a',
+    bgApp: '#f6e9e1',
+    bgSurface: '#fffbf8',
+    bgCard: '#faefe8',
+    accentPrimary: '#ea580c',
+    accentGreen: '#0f766e',
   },
   {
-    id: 'lavender-mist',
-    name: 'Lavender Mist',
+    id: 'royal-lavender',
+    name: 'Royal Lavender',
     isLight: true,
-    bgApp: '#efedf8',
+    bgApp: '#eae6fa',
     bgSurface: '#ffffff',
-    bgCard: '#f7f5fc',
-    accentPrimary: '#7c3aed',
+    bgCard: '#f3f0fc',
+    accentPrimary: '#6d28d9',
+    accentGreen: '#0891b2',
+  },
+  {
+    id: 'sakura-blossom',
+    name: 'Sakura',
+    isLight: true,
+    bgApp: '#fbeaf0',
+    bgSurface: '#ffffff',
+    bgCard: '#fdf3f6',
+    accentPrimary: '#db2777',
     accentGreen: '#059669',
   },
 ];
@@ -144,7 +154,7 @@ export function applyThemeToDocument(theme: ThemeConfig): void {
   );
   root.style.setProperty(
     '--bg-titlebar',
-    adjustHex(theme.bgApp, isLight ? -8 : -4)
+    adjustHex(theme.bgApp, isLight ? -9 : -4)
   );
   root.style.setProperty(
     '--bg-elevated',
@@ -157,18 +167,17 @@ export function applyThemeToDocument(theme: ThemeConfig): void {
 
   root.style.setProperty(
     '--border-subtle',
-    isLight ? adjustHex(theme.bgApp, -16) : adjustHex(theme.bgCard, 2)
+    isLight ? adjustHex(theme.bgApp, -16) : adjustHex(theme.bgCard, 4)
   );
   root.style.setProperty(
     '--border-strong',
-    isLight ? adjustHex(theme.bgApp, -28) : adjustHex(theme.bgCard, 18)
+    isLight ? adjustHex(theme.bgApp, -28) : adjustHex(theme.bgCard, 20)
   );
 
   root.style.setProperty('--text-primary', isLight ? '#0f172a' : '#f8fafc');
   root.style.setProperty('--text-secondary', isLight ? '#475569' : '#94a3b8');
   root.style.setProperty('--text-muted', isLight ? '#64748b' : '#64748b');
 
-  // Contraste de texto em cima dos botões de destaque
   const pLuminance = (0.299 * pRgb.r + 0.587 * pRgb.g + 0.114 * pRgb.b) / 255;
   root.style.setProperty(
     '--text-on-accent',
@@ -187,25 +196,39 @@ export function applyThemeToDocument(theme: ThemeConfig): void {
   );
   root.style.setProperty(
     '--accent-primary-bg',
-    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${isLight ? 0.12 : 0.15})`
+    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${isLight ? 0.11 : 0.16})`
   );
   root.style.setProperty(
     '--accent-primary-border',
-    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${isLight ? 0.42 : 0.38})`
+    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${isLight ? 0.4 : 0.4})`
   );
 
   root.style.setProperty('--accent-green', theme.accentGreen);
   root.style.setProperty(
     '--accent-green-text',
-    isLight ? adjustHex(theme.accentGreen, -18) : adjustHex(theme.accentGreen, 28)
+    isLight ? adjustHex(theme.accentGreen, -14) : adjustHex(theme.accentGreen, 28)
   );
   root.style.setProperty(
     '--accent-green-bg',
-    `rgba(${gRgb.r}, ${gRgb.g}, ${gRgb.b}, ${isLight ? 0.12 : 0.16})`
+    `rgba(${gRgb.r}, ${gRgb.g}, ${gRgb.b}, ${isLight ? 0.08 : 0.14})`
   );
   root.style.setProperty(
     '--accent-green-border',
-    `rgba(${gRgb.r}, ${gRgb.g}, ${gRgb.b}, ${isLight ? 0.42 : 0.42})`
+    `rgba(${gRgb.r}, ${gRgb.g}, ${gRgb.b}, ${isLight ? 0.45 : 0.45})`
+  );
+
+  // Cor específica do botão Multi-Task (harmônica e legível tanto no claro quanto no escuro)
+  root.style.setProperty(
+    '--accent-multi',
+    isLight ? adjustHex(theme.accentPrimary, -10) : theme.accentPrimary
+  );
+  root.style.setProperty(
+    '--accent-multi-bg',
+    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${isLight ? 0.14 : 0.2})`
+  );
+  root.style.setProperty(
+    '--accent-multi-border',
+    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${isLight ? 0.45 : 0.48})`
   );
 
   root.style.setProperty(
