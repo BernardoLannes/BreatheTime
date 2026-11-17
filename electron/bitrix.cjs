@@ -245,14 +245,11 @@ async function callWebhook(method, params = {}, overrideUrl = null) {
   return body;
 }
 
-/** Chama um método REST usando a conexão ativa (Webhook do usuário, OAuth, ou Webhook do .env). */
+/** Chama um método REST usando exclusivamente a credencial do usuário conectado (Webhook próprio ou OAuth). */
 async function callActive(method, params = {}) {
   const c = loadConfig();
   if (c && c.mode === 'webhook' && c.webhookUrl) {
     return callWebhook(method, params, c.webhookUrl);
-  }
-  if (BITRIX_WEBHOOK_URL) {
-    return callWebhook(method, params, BITRIX_WEBHOOK_URL);
   }
   if (c && c.mode === 'oauth') {
     return call(method, params);
