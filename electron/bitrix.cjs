@@ -73,8 +73,7 @@ function loadConfig() {
   } catch {
     config = null; // arquivo corrompido ou de outro usuário do SO
   }
-  // Credenciais de webhook (versões anteriores) não são mais suportadas: exige novo login
-  if (config && config.mode !== 'oauth') config = null;
+  if (config && config.mode !== 'oauth' && config.mode !== 'webhook') config = null;
   return config;
 }
 
@@ -203,9 +202,25 @@ async function call(method, params = {}, retried = false) {
   return body;
 }
 
-/** Chama um método REST pelo webhook de entrada fixo. */
-async function callWebhook(method, params = {}) {
-  const { res, body } = await fetchJson(`${BITRIX_WEBHOOK_URL}${method}.json`, {
+function getActiveWebhookUrl() {
+  const c = loadConfig();
+  if (c && c.mode === 'webhook' && c.webhookUrl) {
+    return c.webhookUrl;
+  }
+  return BITRIX_WEBHOOK_URL || '';
+}
+
+/** Chama um método REST pelo webhook de entrada (salvo pelo usuário ou fixo do .env). */
+async function callWebhook(method, params = {}, overrideUrl = null) {
+  const baseUrl = overrideUrl || getActiveWebhookUrl();
+  if (!baseUrl) {
+    throw new BitrixError(
+      'not_connected',
+      'Webhook do Bitrix24 não configurado. Conecte-se usando seu Webhook nas configurações.'
+    );
+  }
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const { res, body } = await fetchJson(`${normalizedBase}${method}.json`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -219,7 +234,7 @@ async function callWebhook(method, params = {}) {
     if (err === 'insufficient_scope' || err === 'ACCESS_DENIED') {
       throw new BitrixError(
         'forbidden',
-        `Sem permissão no Bitrix24 para ${method} (${detail}). Verifique o escopo "task" do webhook e se o usuário dele participa da tarefa.`
+        `Sem permissão no Bitrix24 para ${method} (${detail}). Verifique os escopos "task" e "user" do webhook.`
       );
     }
     throw new BitrixError('api', detail);
@@ -228,6 +243,21 @@ async function callWebhook(method, params = {}) {
     throw new BitrixError('api', `Resposta inesperada do Bitrix24 (HTTP ${res.status}).`);
   }
   return body;
+}
+
+/** Chama um método REST usando a conexão ativa (Webhook do usuário, OAuth, ou Webhook do .env). */
+async function callActive(method, params = {}) {
+  const c = loadConfig();
+  if (c && c.mode === 'webhook' && c.webhookUrl) {
+    return callWebhook(method, params, c.webhookUrl);
+  }
+  if (BITRIX_WEBHOOK_URL) {
+    return callWebhook(method, params, BITRIX_WEBHOOK_URL);
+  }
+  if (c && c.mode === 'oauth') {
+    return call(method, params);
+  }
+  throw new BitrixError('not_connected', 'Conecte-se ao Bitrix24 primeiro.');
 }
 
 async function fetchCurrentUser() {
@@ -239,13 +269,53 @@ async function fetchCurrentUser() {
 
 function publicStatus() {
   const c = loadConfig();
-  if (!c) return { connected: false };
+  const oauthAvailable = Boolean(BITRIX_CLIENT_SECRET);
+  if (!c) return { connected: false, oauthAvailable };
   return {
     connected: true,
+    mode: c.mode,
     portal: c.portal,
     user: c.user,
     insecureStorage: storageInsecure,
+    oauthAvailable,
   };
+}
+
+async function connectWebhook(rawUrl) {
+  let clean = String(rawUrl || '').trim();
+  if (!clean) {
+    throw new BitrixError('invalid_input', 'Cole a URL do Webhook de entrada do Bitrix24.');
+  }
+  // Remove sufixo de método caso o usuário tenha colado com /profile.json etc.
+  clean = clean.replace(/\/[a-z0-9_.]+\.json\/?$/i, '/');
+  if (!clean.endsWith('/')) clean += '/';
+
+  let parsed;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    throw new BitrixError('invalid_input', 'URL inválida. Use o formato https://seuportal.bitrix24.com.br/rest/123/token/');
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new BitrixError('invalid_input', 'A URL do Webhook precisa começar com https://');
+  }
+
+  const body = await callWebhook('user.current', {}, clean);
+  const u = body.result || {};
+  const user = {
+    id: Number(u.ID),
+    name: [u.NAME, u.LAST_NAME].filter(Boolean).join(' ') || `Usuário ${u.ID}`,
+  };
+
+  saveConfig({
+    mode: 'webhook',
+    webhookUrl: clean,
+    portal: parsed.hostname,
+    user,
+  });
+
+  return publicStatus();
 }
 
 function waitForOAuthCode(expectedState) {
@@ -287,6 +357,12 @@ function waitForOAuthCode(expectedState) {
 }
 
 async function login(onAuthUrl) {
+  if (!BITRIX_CLIENT_SECRET) {
+    throw new BitrixError(
+      'not_configured',
+      'Login OAuth não está configurado neste build (falta BITRIX_CLIENT_SECRET no .env). Use a conexão via Webhook ao lado!'
+    );
+  }
   const previous = loadConfig();
   const state = require('crypto').randomBytes(16).toString('hex');
   const codePromise = waitForOAuthCode(state);
@@ -326,14 +402,20 @@ async function login(onAuthUrl) {
 
 /** Tarefas abertas em que o usuário é responsável, participante ou criador. */
 async function listTasks() {
-  // A listagem usa o webhook fixo (age como o usuário dono do webhook), sem exigir login
-  const uid = BITRIX_WEBHOOK_USER_ID;
+  const c = loadConfig();
+  const uid =
+    (c && c.user && c.user.id) ||
+    (BITRIX_WEBHOOK_USER_ID ? Number(BITRIX_WEBHOOK_USER_ID) : 0);
+
+  if (!uid) {
+    throw new BitrixError('not_connected', 'Conecte-se ao Bitrix24 para listar suas tarefas.');
+  }
 
   const fetchRole = async (field) => {
     const out = [];
     let start = 0;
     for (let page = 0; page < 4; page += 1) {
-      const body = await callWebhook('tasks.task.list', {
+      const body = await callActive('tasks.task.list', {
         filter: { [field]: uid, '<REAL_STATUS': 5 },
         select: ['ID', 'TITLE', 'STATUS', 'GROUP_ID'],
         order: { ID: 'desc' },
@@ -388,8 +470,7 @@ async function logTime({ taskId, seconds, comment, createdDate }) {
   if (isoDate) {
     arfields.CREATED_DATE = isoDate;
   }
-  // Usa o webhook (que tem o escopo "task"); o tempo fica registrado em nome do dono do webhook
-  await callWebhook('task.elapseditem.add', {
+  await callActive('task.elapseditem.add', {
     TASKID: id,
     ARFIELDS: arfields,
   });
@@ -410,6 +491,9 @@ async function wrap(fn) {
 
 function registerBitrixIpc(ipcMain) {
   ipcMain.handle('bitrix:get-status', () => wrap(async () => publicStatus()));
+  ipcMain.handle('bitrix:connect-webhook', (_e, webhookUrl) =>
+    wrap(() => connectWebhook(webhookUrl))
+  );
   ipcMain.handle('bitrix:login', (e) =>
     wrap(() =>
       login((url) => {

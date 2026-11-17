@@ -92,10 +92,12 @@ export interface ElectronWindowState {
 
 export interface BitrixStatus {
   connected: boolean;
+  mode?: 'oauth' | 'webhook';
   portal?: string;
   user?: { id: number; name: string };
   /** true quando a credencial está salva sem criptografia (fallback em Linux sem chaveiro) */
   insecureStorage?: boolean;
+  oauthAvailable?: boolean;
 }
 
 export interface BitrixTask {
@@ -109,6 +111,7 @@ export type BitrixResult<T> =
 
 export interface BitrixApi {
   getStatus: () => Promise<BitrixResult<BitrixStatus>>;
+  connectWebhook: (webhookUrl: string) => Promise<BitrixResult<BitrixStatus>>;
   login: () => Promise<BitrixResult<BitrixStatus>>;
   disconnect: () => Promise<BitrixResult<BitrixStatus>>;
   onOAuthUrl: (callback: (url: string) => void) => () => void;

@@ -2980,3 +2980,19 @@ button {
 :root[data-theme-mode="dark"] .active-running-banner {
   background: linear-gradient(90deg, var(--accent-green-bg) 0%, var(--bg-surface) 75%);
 }
+
+.bitrix-webhook-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bitrix-webhook-box code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-primary);
+}

@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   close: () => ipcRenderer.invoke('window:close'),
   bitrix: {
     getStatus: () => ipcRenderer.invoke('bitrix:get-status'),
+    connectWebhook: (webhookUrl) =>
+      ipcRenderer.invoke('bitrix:connect-webhook', webhookUrl),
     login: () => ipcRenderer.invoke('bitrix:login'),
     disconnect: () => ipcRenderer.invoke('bitrix:disconnect'),
     onOAuthUrl: (callback) => {

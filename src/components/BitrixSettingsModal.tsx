@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Cloud, X, LogOut, LogIn } from 'lucide-react';
+import { Cloud, X, LogOut, LogIn, KeyRound } from 'lucide-react';
 import { BitrixStatus } from '../types/timer';
 
 interface BitrixSettingsModalProps {
@@ -17,6 +17,7 @@ export const BitrixSettingsModal: React.FC<BitrixSettingsModalProps> = ({
   const [error, setError] = useState('');
   const [authUrl, setAuthUrl] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
+  const [webhookInput, setWebhookInput] = useState('');
 
   const api = window.electronAPI?.bitrix;
 
@@ -41,9 +42,17 @@ export const BitrixSettingsModal: React.FC<BitrixSettingsModalProps> = ({
     }
   };
 
+  const handleWebhookSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    run(() => api!.connectWebhook(webhookInput));
+  };
+
   return (
-    <div className="modal-backdrop no-drag">
-      <div className="exit-multi-modal bitrix-modal">
+    <div className="modal-backdrop no-drag" onClick={onClose}>
+      <div
+        className="exit-multi-modal bitrix-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="exit-multi-header">
           <div className="exit-multi-title">
             <Cloud size={15} className="zap-icon" />
@@ -57,13 +66,15 @@ export const BitrixSettingsModal: React.FC<BitrixSettingsModalProps> = ({
         {status.connected ? (
           <>
             <p className="exit-multi-desc">
-              Conectado como <strong>{status.user?.name}</strong> em{' '}
+              Conectado via{' '}
+              <strong>{status.mode === 'webhook' ? 'Webhook' : 'OAuth'}</strong>{' '}
+              como <strong>{status.user?.name}</strong> em{' '}
               <strong>{status.portal}</strong>.
             </p>
             {status.insecureStorage && (
               <p className="bitrix-error">
-                Atenção: este sistema não tem chaveiro, então a credencial foi salva sem
-                criptografia (arquivo legível só pelo seu usuário).
+                Atenção: este sistema não tem chaveiro, então a credencial foi
+                salva sem criptografia (arquivo legível só pelo seu usuário).
               </p>
             )}
             {error && <p className="bitrix-error">{error}</p>}
@@ -75,7 +86,7 @@ export const BitrixSettingsModal: React.FC<BitrixSettingsModalProps> = ({
                 onClick={() => run(() => api!.disconnect())}
               >
                 <LogOut size={14} />
-                <span>Sair</span>
+                <span>Desconectar</span>
               </button>
               <button type="button" className="btn-cancel-multi" onClick={onClose}>
                 Fechar
@@ -84,43 +95,92 @@ export const BitrixSettingsModal: React.FC<BitrixSettingsModalProps> = ({
           </>
         ) : (
           <div className="bitrix-form">
-            <p className="exit-multi-desc">
-              Entre com sua conta do Bitrix24 para vincular tarefas e lançar tempo. O
-              navegador será aberto para você autorizar o acesso.
-            </p>
+            <form onSubmit={handleWebhookSubmit} className="bitrix-webhook-box">
+              <p className="exit-multi-desc">
+                <strong>Conectar via Webhook (Recomendado):</strong> Cole a URL
+                do seu Webhook de entrada do Bitrix24 (com permissões{' '}
+                <code>task</code> e <code>user</code>). Fica salvo criptografado
+                no seu Windows.
+              </p>
+              <input
+                type="url"
+                className="bitrix-picker-search"
+                placeholder="https://seuportal.bitrix24.com.br/rest/123/seu_token/"
+                value={webhookInput}
+                onChange={(e) => setWebhookInput(e.target.value)}
+                disabled={busy}
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="btn-confirm-project"
+                style={{ width: '100%', justifyContent: 'center', height: '32px' }}
+                disabled={busy || !webhookInput.trim()}
+              >
+                <KeyRound size={14} />
+                <span>{busy ? 'Validando Webhook...' : 'Conectar via Webhook'}</span>
+              </button>
+            </form>
 
-            {busy && authUrl && (
-              <div className="bitrix-auth-link">
+            {status.oauthAvailable && (
+              <>
+                <div className="popover-divider" />
                 <p className="exit-multi-desc">
-                  Se o navegador não abriu sozinho, copie este link e abra-o no seu
-                  navegador (você tem 2 minutos):
+                  Ou entre com sua conta do Bitrix24 via navegador:
                 </p>
-                <input type="text" readOnly value={authUrl} onFocus={(e) => e.target.select()} />
+
+                {busy && authUrl && (
+                  <div className="bitrix-auth-link">
+                    <p className="exit-multi-desc">
+                      Se o navegador não abriu sozinho, copie este link e abra-o
+                      no seu navegador (você tem 2 minutos):
+                    </p>
+                    <input
+                      type="text"
+                      readOnly
+                      value={authUrl}
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <button
+                      type="button"
+                      className="btn-cancel-multi"
+                      onClick={async () => {
+                        await navigator.clipboard
+                          .writeText(authUrl)
+                          .catch(() => undefined);
+                        setLinkCopied(true);
+                        setTimeout(() => setLinkCopied(false), 1800);
+                      }}
+                    >
+                      {linkCopied ? 'Copiado!' : 'Copiar link'}
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   className="btn-cancel-multi"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(authUrl).catch(() => undefined);
-                    setLinkCopied(true);
-                    setTimeout(() => setLinkCopied(false), 1800);
+                  style={{
+                    width: '100%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
                   }}
+                  disabled={busy}
+                  onClick={() => run(() => api!.login())}
                 >
-                  {linkCopied ? 'Copiado!' : 'Copiar link'}
+                  <LogIn size={14} />
+                  <span>
+                    {busy
+                      ? 'Aguardando autorização...'
+                      : 'Entrar com Bitrix24 (OAuth)'}
+                  </span>
                 </button>
-              </div>
+              </>
             )}
 
             {error && <p className="bitrix-error">{error}</p>}
-
-            <button
-              type="button"
-              className="btn-confirm-project"
-              disabled={busy}
-              onClick={() => run(() => api!.login())}
-            >
-              <LogIn size={14} />
-              <span>{busy ? 'Aguardando autorização no navegador...' : 'Entrar com Bitrix24'}</span>
-            </button>
           </div>
         )}
       </div>
