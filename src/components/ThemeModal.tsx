@@ -1,5 +1,5 @@
 import React from 'react';
-import { Palette, X, Check, RotateCcw } from 'lucide-react';
+import { Palette, X, Check, RotateCcw, Sun, Moon } from 'lucide-react';
 import { ThemeConfig } from '../types/timer';
 import { PRESET_THEMES } from '../utils/themes';
 
@@ -14,6 +14,9 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
   onChangeTheme,
   onClose,
 }) => {
+  const darkPresets = PRESET_THEMES.filter((t) => !t.isLight);
+  const lightPresets = PRESET_THEMES.filter((t) => t.isLight);
+
   const handleSelectPreset = (preset: ThemeConfig) => {
     onChangeTheme({ ...preset });
   };
@@ -33,6 +36,43 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
     });
   };
 
+  const renderPresetGrid = (list: ThemeConfig[]) => (
+    <div className="theme-presets-grid">
+      {list.map((preset) => {
+        const isSelected = theme.id === preset.id;
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            className={`theme-preset-card ${isSelected ? 'selected' : ''}`}
+            onClick={() => handleSelectPreset(preset)}
+            style={{
+              backgroundColor: preset.bgApp,
+              borderColor: isSelected ? preset.accentPrimary : undefined,
+              color: preset.isLight ? '#0f172a' : '#f8fafc',
+            }}
+          >
+            <div className="theme-swatches">
+              <span style={{ backgroundColor: preset.bgSurface }} />
+              <span style={{ backgroundColor: preset.bgCard }} />
+              <span style={{ backgroundColor: preset.accentPrimary }} />
+              <span style={{ backgroundColor: preset.accentGreen }} />
+            </div>
+            <div className="theme-preset-name">
+              <span>{preset.name}</span>
+              {isSelected && (
+                <Check
+                  size={12}
+                  style={{ color: preset.accentPrimary, flexShrink: 0 }}
+                />
+              )}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="modal-backdrop no-drag" onClick={onClose}>
       <div
@@ -49,41 +89,17 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
           </button>
         </div>
 
-        <div className="theme-section-label">Temas Prontos</div>
-        <div className="theme-presets-grid">
-          {PRESET_THEMES.map((preset) => {
-            const isSelected = theme.id === preset.id;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                className={`theme-preset-card ${isSelected ? 'selected' : ''}`}
-                onClick={() => handleSelectPreset(preset)}
-                style={{
-                  backgroundColor: preset.bgApp,
-                  borderColor: isSelected ? preset.accentPrimary : undefined,
-                  color: preset.isLight ? '#0f172a' : '#f8fafc',
-                }}
-              >
-                <div className="theme-swatches">
-                  <span style={{ backgroundColor: preset.bgSurface }} />
-                  <span style={{ backgroundColor: preset.bgCard }} />
-                  <span style={{ backgroundColor: preset.accentPrimary }} />
-                  <span style={{ backgroundColor: preset.accentGreen }} />
-                </div>
-                <div className="theme-preset-name">
-                  <span>{preset.name}</span>
-                  {isSelected && (
-                    <Check
-                      size={12}
-                      style={{ color: preset.accentPrimary, flexShrink: 0 }}
-                    />
-                  )}
-                </div>
-              </button>
-            );
-          })}
+        <div className="theme-group-title">
+          <Sun size={12} />
+          <span>Temas Claros</span>
         </div>
+        {renderPresetGrid(lightPresets)}
+
+        <div className="theme-group-title" style={{ marginTop: '4px' }}>
+          <Moon size={12} />
+          <span>Temas Escuros</span>
+        </div>
+        {renderPresetGrid(darkPresets)}
 
         <div className="popover-divider" />
 
@@ -144,7 +160,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
             />
           </label>
           <label className="color-field-item mode-toggle">
-            <span>Texto Claro</span>
+            <span>Modo Claro</span>
             <input
               type="checkbox"
               checked={Boolean(theme.isLight)}

@@ -1,6 +1,7 @@
 import { ThemeConfig } from '../types/timer';
 
 export const PRESET_THEMES: ThemeConfig[] = [
+  // ==================== TEMAS ESCUROS ====================
   {
     id: 'midnight-ocean',
     name: 'Midnight Ocean',
@@ -17,7 +18,7 @@ export const PRESET_THEMES: ThemeConfig[] = [
     isLight: false,
     bgApp: '#071310',
     bgSurface: '#0d1f1a',
-    bgCard: '#142c25',
+    bgCard: '#152e27',
     accentPrimary: '#34d399',
     accentGreen: '#22c55e',
   },
@@ -51,14 +52,46 @@ export const PRESET_THEMES: ThemeConfig[] = [
     accentPrimary: '#fb7185',
     accentGreen: '#34d399',
   },
+
+  // ==================== TEMAS CLAROS ====================
   {
-    id: 'clean-light',
-    name: 'Clean Light',
+    id: 'clean-slate',
+    name: 'Clean Slate',
     isLight: true,
-    bgApp: '#f1f5f9',
+    bgApp: '#eef2f6',
     bgSurface: '#ffffff',
     bgCard: '#f8fafc',
     accentPrimary: '#0284c7',
+    accentGreen: '#059669',
+  },
+  {
+    id: 'warm-paper',
+    name: 'Warm Paper',
+    isLight: true,
+    bgApp: '#f5f0e6',
+    bgSurface: '#fffdf9',
+    bgCard: '#faf5eb',
+    accentPrimary: '#d97706',
+    accentGreen: '#059669',
+  },
+  {
+    id: 'mint-breeze',
+    name: 'Mint Breeze',
+    isLight: true,
+    bgApp: '#e8f4f0',
+    bgSurface: '#ffffff',
+    bgCard: '#f2faf7',
+    accentPrimary: '#0d9488',
+    accentGreen: '#16a34a',
+  },
+  {
+    id: 'lavender-mist',
+    name: 'Lavender Mist',
+    isLight: true,
+    bgApp: '#efedf8',
+    bgSurface: '#ffffff',
+    bgCard: '#f7f5fc',
+    accentPrimary: '#7c3aed',
     accentGreen: '#059669',
   },
 ];
@@ -111,21 +144,41 @@ export function applyThemeToDocument(theme: ThemeConfig): void {
   );
   root.style.setProperty(
     '--bg-titlebar',
-    adjustHex(theme.bgApp, isLight ? -10 : -4)
+    adjustHex(theme.bgApp, isLight ? -8 : -4)
+  );
+  root.style.setProperty(
+    '--bg-elevated',
+    isLight ? '#ffffff' : adjustHex(theme.bgCard, 4)
+  );
+  root.style.setProperty(
+    '--bg-subtle',
+    isLight ? adjustHex(theme.bgApp, -6) : adjustHex(theme.bgSurface, -4)
   );
 
   root.style.setProperty(
     '--border-subtle',
-    isLight ? '#e2e8f0' : adjustHex(theme.bgCard, 2)
+    isLight ? adjustHex(theme.bgApp, -16) : adjustHex(theme.bgCard, 2)
   );
   root.style.setProperty(
     '--border-strong',
-    isLight ? '#cbd5e1' : adjustHex(theme.bgCard, 18)
+    isLight ? adjustHex(theme.bgApp, -28) : adjustHex(theme.bgCard, 18)
   );
 
   root.style.setProperty('--text-primary', isLight ? '#0f172a' : '#f8fafc');
   root.style.setProperty('--text-secondary', isLight ? '#475569' : '#94a3b8');
   root.style.setProperty('--text-muted', isLight ? '#64748b' : '#64748b');
+
+  // Contraste de texto em cima dos botões de destaque
+  const pLuminance = (0.299 * pRgb.r + 0.587 * pRgb.g + 0.114 * pRgb.b) / 255;
+  root.style.setProperty(
+    '--text-on-accent',
+    pLuminance > 0.58 ? '#082f49' : '#ffffff'
+  );
+  const gLuminance = (0.299 * gRgb.r + 0.587 * gRgb.g + 0.114 * gRgb.b) / 255;
+  root.style.setProperty(
+    '--text-on-green',
+    gLuminance > 0.58 ? '#052e16' : '#ffffff'
+  );
 
   root.style.setProperty('--accent-primary', theme.accentPrimary);
   root.style.setProperty(
@@ -134,20 +187,35 @@ export function applyThemeToDocument(theme: ThemeConfig): void {
   );
   root.style.setProperty(
     '--accent-primary-bg',
-    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.14)`
+    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${isLight ? 0.12 : 0.15})`
   );
   root.style.setProperty(
     '--accent-primary-border',
-    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.38)`
+    `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${isLight ? 0.42 : 0.38})`
   );
 
   root.style.setProperty('--accent-green', theme.accentGreen);
   root.style.setProperty(
+    '--accent-green-text',
+    isLight ? adjustHex(theme.accentGreen, -18) : adjustHex(theme.accentGreen, 28)
+  );
+  root.style.setProperty(
     '--accent-green-bg',
-    `rgba(${gRgb.r}, ${gRgb.g}, ${gRgb.b}, 0.15)`
+    `rgba(${gRgb.r}, ${gRgb.g}, ${gRgb.b}, ${isLight ? 0.12 : 0.16})`
   );
   root.style.setProperty(
     '--accent-green-border',
-    `rgba(${gRgb.r}, ${gRgb.g}, ${gRgb.b}, 0.42)`
+    `rgba(${gRgb.r}, ${gRgb.g}, ${gRgb.b}, ${isLight ? 0.42 : 0.42})`
+  );
+
+  root.style.setProperty(
+    '--hover-overlay',
+    isLight ? 'rgba(15, 23, 42, 0.06)' : 'rgba(255, 255, 255, 0.07)'
+  );
+  root.style.setProperty(
+    '--shadow-popover',
+    isLight
+      ? '0 10px 26px rgba(15, 23, 42, 0.16)'
+      : '0 12px 28px rgba(0, 0, 0, 0.65)'
   );
 }
