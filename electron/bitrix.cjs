@@ -192,7 +192,13 @@ async function call(method, params = {}, retried = false) {
       throw new BitrixError('auth', 'Credencial inválida ou revogada. Reconecte ao Bitrix24.');
     }
     if (err === 'insufficient_scope' || err === 'ACCESS_DENIED') {
-      throw new BitrixError('forbidden', 'Sem permissão para esta operação no Bitrix24.');
+      const detail = [err, body.error_description].filter(Boolean).join(': ');
+      throw new BitrixError(
+        'forbidden',
+        err === 'insufficient_scope'
+          ? `Sem permissão no token OAuth (${detail}). Se você acabou de liberar "task" no Bitrix24, desconecte e entre novamente na nuvem ☁️ para atualizar o token.`
+          : `Acesso negado pelo Bitrix24 (${detail}). Verifique se você participa desta tarefa ou se tem permissão para lançar tempo nela.`
+      );
     }
     throw new BitrixError('api', body.error_description || err);
   }
