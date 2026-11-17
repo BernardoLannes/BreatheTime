@@ -24,6 +24,7 @@ interface ProjectSectionProps {
   onToggleExpandTask: (taskId: string) => void;
   onUpdateTaskTitle: (taskId: string, title: string) => void;
   onDeleteTask: (taskId: string) => void;
+  onMoveTask: (taskId: string, direction: 'up' | 'down') => void;
   onAddDivision: (taskId: string) => void;
   onTogglePlayDivision: (divisionId: string) => void;
   onUpdateDivisionLabel: (divisionId: string, label: string) => void;
@@ -49,6 +50,7 @@ export const ProjectSection: React.FC<ProjectSectionProps> = ({
   onToggleExpandTask,
   onUpdateTaskTitle,
   onDeleteTask,
+  onMoveTask,
   onAddDivision,
   onTogglePlayDivision,
   onUpdateDivisionLabel,
@@ -60,12 +62,23 @@ export const ProjectSection: React.FC<ProjectSectionProps> = ({
   onCompleteAllTaskDivisions,
 }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
 
   const projectTotalMs = divisions.reduce(
     (acc, div) => acc + getDivisionElapsedMs(div, now),
     0
   );
   const projectTime = splitDuration(projectTotalMs);
+  const hasProjectContent = tasks.length > 0 || projectTotalMs > 0;
+
+  const handleDeleteProjectClick = () => {
+    if (!hasProjectContent || confirmDeleteProject) {
+      onDeleteProject(project.id);
+      return;
+    }
+    setConfirmDeleteProject(true);
+    setTimeout(() => setConfirmDeleteProject(false), 3000);
+  };
 
   const handleAddTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,11 +127,19 @@ export const ProjectSection: React.FC<ProjectSectionProps> = ({
 
         <button
           type="button"
-          className="icon-action-btn danger"
-          onClick={() => onDeleteProject(project.id)}
-          title="Excluir projeto"
+          className={`icon-action-btn danger ${confirmDeleteProject ? 'confirming-del' : ''}`}
+          onClick={handleDeleteProjectClick}
+          title={
+            confirmDeleteProject
+              ? 'Clique novamente para confirmar a exclusão do projeto e suas tarefas'
+              : 'Excluir projeto'
+          }
         >
-          <Trash2 size={13} />
+          {confirmDeleteProject ? (
+            <span className="confirm-del-txt">Excluir?</span>
+          ) : (
+            <Trash2 size={13} />
+          )}
         </button>
       </div>
 
@@ -149,7 +170,7 @@ export const ProjectSection: React.FC<ProjectSectionProps> = ({
             </div>
           ) : (
             <div className="tasks-list">
-              {tasks.map((task) => {
+              {tasks.map((task, idx) => {
                 const taskDivisions = divisions.filter((d) => d.taskId === task.id);
                 return (
                   <TaskCard
@@ -162,6 +183,9 @@ export const ProjectSection: React.FC<ProjectSectionProps> = ({
                     onToggleExpandTask={onToggleExpandTask}
                     onUpdateTaskTitle={onUpdateTaskTitle}
                     onDeleteTask={onDeleteTask}
+                    canMoveUp={idx > 0}
+                    canMoveDown={idx < tasks.length - 1}
+                    onMoveTask={onMoveTask}
                     onAddDivision={onAddDivision}
                     onTogglePlayDivision={onTogglePlayDivision}
                     onUpdateDivisionLabel={onUpdateDivisionLabel}

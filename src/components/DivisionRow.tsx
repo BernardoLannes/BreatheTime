@@ -453,6 +453,21 @@ export const DivisionRow: React.FC<DivisionRowProps> = ({
                 : undefined
           }
         />
+
+        {bitrix.status.connected && taskBitrixId && elapsedMs >= 1000 && (
+          <BitrixLogButton
+            label="Lançar+Fim"
+            className="division-log-btn bitrix-log-complete-btn"
+            iconSize={14}
+            onLog={async () => {
+              const res = await bitrix.logDivision(division.id);
+              if (res.ok) {
+                onCompleteAndReset(division.id);
+              }
+              return res;
+            }}
+          />
+        )}
       </div>
     </div>
   );

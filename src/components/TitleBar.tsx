@@ -13,8 +13,10 @@ import {
   RotateCcw,
   Power,
   Cloud,
+  MoveHorizontal,
+  Bell,
 } from 'lucide-react';
-import { ShortcutConfig } from '../types/timer';
+import { ReminderSettings, ShortcutConfig } from '../types/timer';
 
 interface TitleBarProps {
   alwaysOnTop: boolean;
@@ -29,6 +31,10 @@ interface TitleBarProps {
   onUpdateShortcuts: (next: ShortcutConfig) => void;
   autoLaunch: boolean;
   onToggleAutoLaunch: () => void;
+  avoidMouse: boolean;
+  onToggleAvoidMouse: () => void;
+  reminders: ReminderSettings;
+  onUpdateReminders: (next: ReminderSettings) => void;
   bitrixConnected: boolean;
   onOpenBitrix: () => void;
 }
@@ -37,6 +43,8 @@ const DEFAULT_SHORTCUTS: ShortcutConfig = {
   togglePlay: 'Alt+Shift+P',
   toggleCompact: 'Alt+Shift+M',
   toggleMinimize: 'Alt+Shift+B',
+  copyDescription: 'Alt+Shift+C',
+  toggleAvoidMouse: 'Alt+Shift+E',
 };
 
 function formatKeyEventToAccelerator(e: React.KeyboardEvent): string | null {
@@ -83,6 +91,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onUpdateShortcuts,
   autoLaunch,
   onToggleAutoLaunch,
+  avoidMouse,
+  onToggleAvoidMouse,
+  reminders,
+  onUpdateReminders,
   bitrixConnected,
   onOpenBitrix,
 }) => {
@@ -267,6 +279,79 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                       : shortcuts.toggleMinimize}
                   </button>
                 </div>
+
+                <div className="shortcut-row">
+                  <span className="shortcut-label">Copiar Descrição</span>
+                  <button
+                    type="button"
+                    className={`shortcut-key-btn ${recordingField === 'copyDescription' ? 'recording' : ''}`}
+                    onClick={() => setRecordingField('copyDescription')}
+                    onKeyDown={(e) => handleRecordKeyDown(e, 'copyDescription')}
+                  >
+                    {recordingField === 'copyDescription'
+                      ? 'Pressione ex: Alt+Shift+C...'
+                      : shortcuts.copyDescription}
+                  </button>
+                </div>
+
+                <div className="shortcut-row">
+                  <span className="shortcut-label">Avoid Mouse (Esquiva)</span>
+                  <button
+                    type="button"
+                    className={`shortcut-key-btn ${recordingField === 'toggleAvoidMouse' ? 'recording' : ''}`}
+                    onClick={() => setRecordingField('toggleAvoidMouse')}
+                    onKeyDown={(e) => handleRecordKeyDown(e, 'toggleAvoidMouse')}
+                  >
+                    {recordingField === 'toggleAvoidMouse'
+                      ? 'Pressione ex: Alt+Shift+E...'
+                      : shortcuts.toggleAvoidMouse}
+                  </button>
+                </div>
+              </div>
+
+              <div className="popover-divider" />
+
+              <div className="reminders-section">
+                <div className="reminders-header">
+                  <Bell size={12} className="bell-icon" />
+                  <span>Lembretes de Produtividade</span>
+                </div>
+                <div className="reminder-row">
+                  <span>Avisar se parado por:</span>
+                  <select
+                    className="reminder-select"
+                    value={reminders.idleMinutes}
+                    onChange={(e) =>
+                      onUpdateReminders({
+                        ...reminders,
+                        idleMinutes: Number(e.target.value),
+                      })
+                    }
+                  >
+                    <option value={0}>Desativado</option>
+                    <option value={10}>10 min</option>
+                    <option value={15}>15 min</option>
+                    <option value={30}>30 min</option>
+                  </select>
+                </div>
+                <div className="reminder-row">
+                  <span>Lembrete de pausa após:</span>
+                  <select
+                    className="reminder-select"
+                    value={reminders.breakMinutes}
+                    onChange={(e) =>
+                      onUpdateReminders({
+                        ...reminders,
+                        breakMinutes: Number(e.target.value),
+                      })
+                    }
+                  >
+                    <option value={0}>Desativado</option>
+                    <option value={60}>60 min</option>
+                    <option value={90}>90 min</option>
+                    <option value={120}>2 horas</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
@@ -335,6 +420,20 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           }
         >
           <Power size={13} />
+        </button>
+
+        {/* Botão Avoid Mouse (Esquiva Inteligente) */}
+        <button
+          type="button"
+          className={`icon-btn ${avoidMouse ? 'pinned' : ''}`}
+          onClick={onToggleAvoidMouse}
+          title={
+            avoidMouse
+              ? `Avoid Mouse ATIVO (${shortcuts.toggleAvoidMouse}): quando não estiver focada, a janela foge para o outro lado da tela ao passar o mouse`
+              : `Ativar Avoid Mouse (${shortcuts.toggleAvoidMouse}): a janela foge para o outro lado da tela quando o mouse passa por cima`
+          }
+        >
+          <MoveHorizontal size={14} />
         </button>
 
         {/* Botão Modo Pílula (Mini-Barra Flutuante) */}

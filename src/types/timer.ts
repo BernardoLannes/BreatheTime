@@ -54,6 +54,13 @@ export interface ShortcutConfig {
   togglePlay: string;
   toggleCompact: string;
   toggleMinimize: string;
+  copyDescription: string;
+  toggleAvoidMouse: string;
+}
+
+export interface ReminderSettings {
+  idleMinutes: number; // 0 = desativado
+  breakMinutes: number; // 0 = desativado
 }
 
 export interface ElectronWindowState {
@@ -62,6 +69,7 @@ export interface ElectronWindowState {
   opacity: number;
   shortcuts: ShortcutConfig;
   autoLaunch: boolean;
+  avoidMouse: boolean;
 }
 
 export interface BitrixStatus {
@@ -104,12 +112,18 @@ declare global {
       ensureCompactHeight: (minHeight: number) => Promise<void>;
       setOpacity: (opacity: number) => Promise<number>;
       setAutoLaunch: (enabled: boolean) => Promise<boolean>;
+      setAvoidMouse: (enabled: boolean) => Promise<boolean>;
+      openExternal: (url: string) => Promise<void>;
       updateShortcuts: (shortcuts: ShortcutConfig) => Promise<ShortcutConfig>;
       minimize: () => Promise<void>;
       close: () => Promise<void>;
       onShortcutTogglePlay: (callback: () => void) => () => void;
       onShortcutCompactChanged: (
         callback: (isCompact: boolean) => void
+      ) => () => void;
+      onShortcutCopyDescription: (callback: () => void) => () => void;
+      onShortcutAvoidMouseChanged: (
+        callback: (enabled: boolean) => void
       ) => () => void;
     };
   }

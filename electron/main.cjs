@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { registerBitrixIpc } = require('./bitrix.cjs');
@@ -8,6 +8,9 @@ let isAlwaysOnTop = true;
 let isCompactMode = false;
 let currentOpacity = 1.0;
 let isTransitioningMode = false;
+let avoidMouseEnabled = false;
+let avoidMouseInterval = null;
+let lastDodgeAt = 0;
 
 function getStartupExePath() {
   // Se estiver rodando do BreatheTime.exe empacotado, usa o próprio process.execPath
@@ -56,7 +59,83 @@ let currentShortcuts = {
   togglePlay: 'Alt+Shift+P',
   toggleCompact: 'Alt+Shift+M',
   toggleMinimize: 'Alt+Shift+B',
+  copyDescription: 'Alt+Shift+C',
+  toggleAvoidMouse: 'Alt+Shift+E',
 };
+
+function startAvoidMouseLoop() {
+  if (avoidMouseInterval) return;
+  avoidMouseInterval = setInterval(() => {
+    if (!avoidMouseEnabled || !mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized() || !mainWindow.isVisible() || isTransitioningMode) return;
+    // Se a janela estiver focada (usuário clicou via taskbar/Alt+Tab), deixa interagir normalmente
+    if (mainWindow.isFocused()) return;
+
+    const now = Date.now();
+    if (now - lastDodgeAt < 550) return;
+
+    const cursor = screen.getCursorScreenPoint();
+    const b = mainWindow.getBounds();
+    const inside =
+      cursor.x >= b.x - 6 &&
+      cursor.x <= b.x + b.width + 6 &&
+      cursor.y >= b.y - 6 &&
+      cursor.y <= b.y + b.height + 6;
+
+    if (!inside) return;
+
+    lastDodgeAt = now;
+    const display = screen.getDisplayMatching(b);
+    const wa = display.workArea;
+    const windowCenterX = b.x + b.width / 2;
+    const workCenterX = wa.x + wa.width / 2;
+
+    // Move para o lado horizontal oposto do monitor atual
+    const targetX =
+      windowCenterX > workCenterX
+        ? wa.x + 20
+        : Math.max(wa.x + 20, wa.x + wa.width - b.width - 20);
+    const clampedY = Math.max(
+      wa.y + 12,
+      Math.min(b.y, wa.y + wa.height - b.height - 12)
+    );
+
+    isTransitioningMode = true;
+    mainWindow.setBounds(
+      {
+        x: Math.round(targetX),
+        y: Math.round(clampedY),
+        width: b.width,
+        height: b.height,
+      },
+      true
+    );
+    saveCurrentWindowBounds();
+    setTimeout(() => {
+      isTransitioningMode = false;
+    }, 150);
+  }, 80);
+}
+
+function stopAvoidMouseLoop() {
+  if (avoidMouseInterval) {
+    clearInterval(avoidMouseInterval);
+    avoidMouseInterval = null;
+  }
+}
+
+function setAvoidMouse(enabled) {
+  avoidMouseEnabled = Boolean(enabled);
+  if (avoidMouseEnabled) {
+    startAvoidMouseLoop();
+  } else {
+    stopAvoidMouseLoop();
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('shortcut:avoid-mouse-changed', avoidMouseEnabled);
+  }
+  return avoidMouseEnabled;
+}
 
 // Guarda separadamente o tamanho/posição do modo completo e do modo compacto
 let savedFullBounds = {
@@ -202,6 +281,28 @@ function registerGlobalShortcuts(shortcutsConfig) {
     }
   }
 
+  if (merged.copyDescription) {
+    try {
+      globalShortcut.register(merged.copyDescription, () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('shortcut:copy-description');
+        }
+      });
+    } catch (e) {
+      console.error('Failed to register copyDescription shortcut:', e);
+    }
+  }
+
+  if (merged.toggleAvoidMouse) {
+    try {
+      globalShortcut.register(merged.toggleAvoidMouse, () => {
+        setAvoidMouse(!avoidMouseEnabled);
+      });
+    } catch (e) {
+      console.error('Failed to register toggleAvoidMouse shortcut:', e);
+    }
+  }
+
   return currentShortcuts;
 }
 
@@ -299,7 +400,19 @@ ipcMain.handle('window:get-state', () => {
     opacity: currentOpacity,
     shortcuts: currentShortcuts,
     autoLaunch: getAutoLaunchEnabled(),
+    avoidMouse: avoidMouseEnabled,
   };
+});
+
+ipcMain.handle('window:set-avoid-mouse', (_event, enabled) => {
+  return setAvoidMouse(enabled);
+});
+
+ipcMain.handle('window:open-external', (_event, rawUrl) => {
+  if (typeof rawUrl === 'string' && /^https?:\/\//i.test(rawUrl)) {
+    return shell.openExternal(rawUrl);
+  }
+  return Promise.resolve();
 });
 
 ipcMain.handle('window:set-auto-launch', (_event, enabled) => {
@@ -383,6 +496,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  stopAvoidMouseLoop();
   globalShortcut.unregisterAll();
 });
 

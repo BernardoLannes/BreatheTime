@@ -11,6 +11,8 @@ import {
   PauseCircle,
   Play,
   X,
+  Search,
+  Bell,
 } from 'lucide-react';
 import {
   Project,
@@ -18,6 +20,7 @@ import {
   TimerDivision,
   CompletedLogEntry,
   ShortcutConfig,
+  ReminderSettings,
   BitrixStatus,
 } from './types/timer';
 import {
@@ -40,6 +43,13 @@ const DEFAULT_SHORTCUTS: ShortcutConfig = {
   togglePlay: 'Alt+Shift+P',
   toggleCompact: 'Alt+Shift+M',
   toggleMinimize: 'Alt+Shift+B',
+  copyDescription: 'Alt+Shift+C',
+  toggleAvoidMouse: 'Alt+Shift+E',
+};
+
+const DEFAULT_REMINDERS: ReminderSettings = {
+  idleMinutes: 0,
+  breakMinutes: 0,
 };
 
 const DEFAULT_PRESET_LABELS = [
@@ -74,6 +84,7 @@ interface StoredState {
   shortcuts: ShortcutConfig;
   presetLabels: string[];
   unfocusedOpacity?: number;
+  reminders?: ReminderSettings;
 }
 
 function getInitialState(): StoredState {
@@ -103,6 +114,10 @@ function getInitialState(): StoredState {
             typeof parsed.unfocusedOpacity === 'number'
               ? parsed.unfocusedOpacity
               : 1.0,
+          reminders: {
+            ...DEFAULT_REMINDERS,
+            ...(parsed.reminders || {}),
+          },
         };
       }
     }
@@ -180,6 +195,12 @@ export const App: React.FC = () => {
     initial.unfocusedOpacity ?? 1.0
   );
   const [autoLaunch, setAutoLaunch] = useState<boolean>(false);
+  const [avoidMouse, setAvoidMouse] = useState<boolean>(false);
+  const [reminders, setReminders] = useState<ReminderSettings>(
+    initial.reminders || DEFAULT_REMINDERS
+  );
+  const [reminderBanner, setReminderBanner] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Navegação e UI
   const [activeTab, setActiveTab] = useState<'timers' | 'history'>('timers');
@@ -220,6 +241,7 @@ export const App: React.FC = () => {
       setAlwaysOnTop(st.alwaysOnTop);
       setCompactMode(st.compactMode);
       setAutoLaunch(Boolean(st.autoLaunch));
+      setAvoidMouse(Boolean(st.avoidMouse));
       if (initial.unfocusedOpacity && initial.unfocusedOpacity < 1) {
         window.electronAPI?.setOpacity(initial.unfocusedOpacity);
       } else {
@@ -241,6 +263,7 @@ export const App: React.FC = () => {
       shortcuts,
       presetLabels,
       unfocusedOpacity: opacity,
+      reminders,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
@@ -257,6 +280,7 @@ export const App: React.FC = () => {
     shortcuts,
     presetLabels,
     opacity,
+    reminders,
   ]);
 
   const handleTogglePlayDivision = useCallback(
@@ -378,11 +402,69 @@ export const App: React.FC = () => {
     setShowExitMultiModal(false);
   };
 
-  // Refs para uso no atalho global de Play/Pause
+  // Refs para uso nos atalhos globais e lembretes
   const divisionsRef = useRef(divisions);
   divisionsRef.current = divisions;
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
   const selectedDivisionIdRef = useRef(selectedDivisionId);
   selectedDivisionIdRef.current = selectedDivisionId;
+
+  // Lembretes de ociosidade / pausa contínua
+  const lastRunningChangeRef = useRef<number>(Date.now());
+  const lastIdleNotifiedRef = useRef<number>(0);
+  const lastBreakNotifiedRef = useRef<number>(0);
+  const anyRunningNow = divisions.some((d) => d.isRunning);
+
+  useEffect(() => {
+    lastRunningChangeRef.current = Date.now();
+    lastIdleNotifiedRef.current = 0;
+    lastBreakNotifiedRef.current = 0;
+    if (anyRunningNow) {
+      setReminderBanner((prev) =>
+        prev && prev.includes('parado') ? null : prev
+      );
+    }
+  }, [anyRunningNow]);
+
+  useEffect(() => {
+    if (reminders.idleMinutes <= 0 && reminders.breakMinutes <= 0) return;
+
+    const timer = setInterval(() => {
+      const current = Date.now();
+      const elapsedMin = (current - lastRunningChangeRef.current) / 60000;
+
+      if (!anyRunningNow && reminders.idleMinutes > 0) {
+        if (
+          elapsedMin >= reminders.idleMinutes &&
+          current - lastIdleNotifiedRef.current >= reminders.idleMinutes * 60000
+        ) {
+          lastIdleNotifiedRef.current = current;
+          const msg = `Nenhum cronômetro ativo há ${reminders.idleMinutes} min.`;
+          setReminderBanner(msg);
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('BreatheTime — Lembrete', { body: msg });
+          }
+        }
+      }
+
+      if (anyRunningNow && reminders.breakMinutes > 0) {
+        if (
+          elapsedMin >= reminders.breakMinutes &&
+          current - lastBreakNotifiedRef.current >= reminders.breakMinutes * 60000
+        ) {
+          lastBreakNotifiedRef.current = current;
+          const msg = `Você está cronometrando há ${reminders.breakMinutes} min seguidos. Que tal uma pausa?`;
+          setReminderBanner(msg);
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('BreatheTime — Hora da Pausa', { body: msg });
+          }
+        }
+      }
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, [anyRunningNow, reminders.idleMinutes, reminders.breakMinutes]);
 
   useEffect(() => {
     const unsubPlay = window.electronAPI?.onShortcutTogglePlay(() => {
@@ -409,9 +491,35 @@ export const App: React.FC = () => {
       }
     );
 
+    const unsubCopy = window.electronAPI?.onShortcutCopyDescription(() => {
+      const currentDivs = divisionsRef.current;
+      const target =
+        currentDivs.find((d) => d.isRunning) ||
+        currentDivs.find((d) => d.id === selectedDivisionIdRef.current) ||
+        currentDivs[0];
+      if (!target) return;
+      const t = tasksRef.current.find((item) => item.id === target.taskId);
+      const txt = formatDivisionClipboardText(
+        target.label,
+        target.description,
+        t?.title || ''
+      );
+      if (txt) {
+        copyToClipboard(txt);
+      }
+    });
+
+    const unsubAvoid = window.electronAPI?.onShortcutAvoidMouseChanged(
+      (enabled) => {
+        setAvoidMouse(enabled);
+      }
+    );
+
     return () => {
       unsubPlay?.();
       unsubCompact?.();
+      unsubCopy?.();
+      unsubAvoid?.();
     };
   }, [handleTogglePlayDivision]);
 
@@ -459,6 +567,38 @@ export const App: React.FC = () => {
     } else {
       setAutoLaunch(target);
     }
+  };
+
+  const handleToggleAvoidMouse = async () => {
+    const target = !avoidMouse;
+    if (window.electronAPI) {
+      const updated = await window.electronAPI.setAvoidMouse(target);
+      setAvoidMouse(updated);
+    } else {
+      setAvoidMouse(target);
+    }
+  };
+
+  const handleMoveTask = (taskId: string, direction: 'up' | 'down') => {
+    setTasks((prev) => {
+      const targetTask = prev.find((t) => t.id === taskId);
+      if (!targetTask) return prev;
+
+      const sameProjectTasks = prev.filter(
+        (t) => t.projectId === targetTask.projectId
+      );
+      const localIdx = sameProjectTasks.findIndex((t) => t.id === taskId);
+      const swapIdx = direction === 'up' ? localIdx - 1 : localIdx + 1;
+      if (swapIdx < 0 || swapIdx >= sameProjectTasks.length) return prev;
+
+      const neighborTask = sameProjectTasks[swapIdx];
+      const idxA = prev.findIndex((t) => t.id === targetTask.id);
+      const idxB = prev.findIndex((t) => t.id === neighborTask.id);
+      const copy = [...prev];
+      copy[idxA] = prev[idxB];
+      copy[idxB] = prev[idxA];
+      return copy;
+    });
   };
 
   // ==================== LÓGICA DE PROJETOS ====================
@@ -1059,9 +1199,11 @@ export const App: React.FC = () => {
           activeDivision={activeCompactDivision}
           now={now}
           alwaysOnTop={alwaysOnTop}
+          avoidMouse={avoidMouse}
           autoPauseOthers={autoPauseOthers}
           onToggleAutoPause={handleRequestToggleAutoPause}
           onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
+          onToggleAvoidMouse={handleToggleAvoidMouse}
           onExitCompactMode={() => handleSetCompactMode(false)}
           onTogglePlayDivision={handleTogglePlayDivision}
           onAdjustTimeMs={handleAdjustDivisionTimeMs}
@@ -1089,9 +1231,38 @@ export const App: React.FC = () => {
         onUpdateShortcuts={handleUpdateShortcuts}
         autoLaunch={autoLaunch}
         onToggleAutoLaunch={handleToggleAutoLaunch}
+        avoidMouse={avoidMouse}
+        onToggleAvoidMouse={handleToggleAvoidMouse}
+        reminders={reminders}
+        onUpdateReminders={(next) => {
+          setReminders(next);
+          if (
+            (next.idleMinutes > 0 || next.breakMinutes > 0) &&
+            'Notification' in window &&
+            Notification.permission === 'default'
+          ) {
+            Notification.requestPermission().catch(() => undefined);
+          }
+        }}
         bitrixConnected={bitrixStatus.connected}
         onOpenBitrix={() => setShowBitrixModal(true)}
       />
+
+      {reminderBanner && (
+        <div className="reminder-toast-banner">
+          <div className="reminder-toast-left">
+            <Bell size={13} />
+            <span>{reminderBanner}</span>
+          </div>
+          <button
+            type="button"
+            className="reminder-toast-close"
+            onClick={() => setReminderBanner(null)}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       {/* Destaque Fixo dos Cronômetros Ativos no Topo (mostra 1 ou todos em Multi-Task) */}
       {runningDivisions.length > 0 && (
@@ -1238,61 +1409,119 @@ export const App: React.FC = () => {
       {/* Área Principal Rolável */}
       <main className="main-content-scroll">
         {activeTab === 'timers' ? (
-          projects.length === 0 ? (
-            <div className="empty-projects-state">
-              <FolderPlus size={36} className="empty-icon" />
-              <h3>Comece criando um Projeto</h3>
-              <p>
-                Organize suas tarefas por Projeto/Cliente, crie divisões de
-                cronômetro e copie as descrições com 1 clique para o Bitrix24.
-              </p>
-              <button
-                type="button"
-                className="btn-primary-md"
-                onClick={() => setShowNewProjectForm(true)}
-              >
-                + Criar Primeiro Projeto
-              </button>
-            </div>
-          ) : (
-            <div className="projects-stack">
-              {projects.map((project) => {
-                const projectTasks = tasks.filter(
-                  (t) => t.projectId === project.id
-                );
-                const projectDivisions = divisions.filter(
-                  (d) => d.projectId === project.id
-                );
-                return (
-                  <ProjectSection
-                    key={project.id}
-                    project={project}
-                    tasks={projectTasks}
-                    divisions={projectDivisions}
-                    now={now}
-                    presetLabels={presetLabels}
-                    onUpdatePresetLabels={setPresetLabels}
-                    onToggleExpandProject={handleToggleExpandProject}
-                    onUpdateProjectName={handleUpdateProjectName}
-                    onDeleteProject={handleDeleteProject}
-                    onCreateTask={handleCreateTask}
-                    onToggleExpandTask={handleToggleExpandTask}
-                    onUpdateTaskTitle={handleUpdateTaskTitle}
-                    onDeleteTask={handleDeleteTask}
-                    onAddDivision={handleAddDivision}
-                    onTogglePlayDivision={handleTogglePlayDivision}
-                    onUpdateDivisionLabel={handleUpdateDivisionLabel}
-                    onUpdateDivisionDescription={handleUpdateDivisionDescription}
-                    onAdjustDivisionTimeMs={handleAdjustDivisionTimeMs}
-                    onSetDivisionManualTime={handleSetDivisionManualTime}
-                    onCompleteDivision={handleCompleteDivision}
-                    onDeleteDivision={handleDeleteDivision}
-                    onCompleteAllTaskDivisions={handleCompleteAllTaskDivisions}
-                  />
-                );
-              })}
-            </div>
-          )
+          <>
+            {projects.length > 0 && (
+              <div className="search-filter-bar">
+                <Search size={13} className="search-icon" />
+                <input
+                  type="text"
+                  className="search-filter-input"
+                  placeholder="Filtrar projetos, tarefas, labels ou descrições..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    className="search-clear-btn"
+                    onClick={() => setSearchQuery('')}
+                    title="Limpar filtro"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {projects.length === 0 ? (
+              <div className="empty-projects-state">
+                <FolderPlus size={36} className="empty-icon" />
+                <h3>Comece criando um Projeto</h3>
+                <p>
+                  Organize suas tarefas por Projeto/Cliente, crie divisões de
+                  cronômetro e copie as descrições com 1 clique para o Bitrix24.
+                </p>
+                <button
+                  type="button"
+                  className="btn-primary-md"
+                  onClick={() => setShowNewProjectForm(true)}
+                >
+                  + Criar Primeiro Projeto
+                </button>
+              </div>
+            ) : (
+              <div className="projects-stack">
+                {projects
+                  .map((project) => {
+                    const q = searchQuery.trim().toLowerCase();
+                    const allProjTasks = tasks.filter(
+                      (t) => t.projectId === project.id
+                    );
+                    const allProjDivs = divisions.filter(
+                      (d) => d.projectId === project.id
+                    );
+
+                    if (!q) {
+                      return { project, projectTasks: allProjTasks, projectDivisions: allProjDivs };
+                    }
+
+                    const projMatch = project.name.toLowerCase().includes(q);
+                    if (projMatch) {
+                      return { project, projectTasks: allProjTasks, projectDivisions: allProjDivs };
+                    }
+
+                    const filteredTasks = allProjTasks.filter((t) => {
+                      if (t.title.toLowerCase().includes(q)) return true;
+                      const tDivs = allProjDivs.filter((d) => d.taskId === t.id);
+                      return tDivs.some(
+                        (d) =>
+                          d.label.toLowerCase().includes(q) ||
+                          d.description.toLowerCase().includes(q)
+                      );
+                    });
+
+                    if (filteredTasks.length === 0) return null;
+                    return {
+                      project: { ...project, isExpanded: true },
+                      projectTasks: filteredTasks,
+                      projectDivisions: allProjDivs,
+                    };
+                  })
+                  .filter(Boolean)
+                  .map((item) => {
+                    const { project, projectTasks, projectDivisions } = item!;
+                    return (
+                      <ProjectSection
+                        key={project.id}
+                        project={project}
+                        tasks={projectTasks}
+                        divisions={projectDivisions}
+                        now={now}
+                        presetLabels={presetLabels}
+                        onUpdatePresetLabels={setPresetLabels}
+                        onToggleExpandProject={handleToggleExpandProject}
+                        onUpdateProjectName={handleUpdateProjectName}
+                        onDeleteProject={handleDeleteProject}
+                        onCreateTask={handleCreateTask}
+                        onToggleExpandTask={handleToggleExpandTask}
+                        onUpdateTaskTitle={handleUpdateTaskTitle}
+                        onDeleteTask={handleDeleteTask}
+                        onMoveTask={handleMoveTask}
+                        onAddDivision={handleAddDivision}
+                        onTogglePlayDivision={handleTogglePlayDivision}
+                        onUpdateDivisionLabel={handleUpdateDivisionLabel}
+                        onUpdateDivisionDescription={handleUpdateDivisionDescription}
+                        onAdjustDivisionTimeMs={handleAdjustDivisionTimeMs}
+                        onSetDivisionManualTime={handleSetDivisionManualTime}
+                        onCompleteDivision={handleCompleteDivision}
+                        onDeleteDivision={handleDeleteDivision}
+                        onCompleteAllTaskDivisions={handleCompleteAllTaskDivisions}
+                      />
+                    );
+                  })}
+              </div>
+            )}
+          </>
         ) : (
           <HistoryTab
             entries={history}

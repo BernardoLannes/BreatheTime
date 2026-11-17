@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('window:ensure-compact-height', minHeight),
   setOpacity: (opacity) => ipcRenderer.invoke('window:set-opacity', opacity),
   setAutoLaunch: (enabled) => ipcRenderer.invoke('window:set-auto-launch', enabled),
+  setAvoidMouse: (enabled) => ipcRenderer.invoke('window:set-avoid-mouse', enabled),
+  openExternal: (url) => ipcRenderer.invoke('window:open-external', url),
   updateShortcuts: (shortcuts) => ipcRenderer.invoke('window:update-shortcuts', shortcuts),
   minimize: () => ipcRenderer.invoke('window:minimize'),
   close: () => ipcRenderer.invoke('window:close'),
@@ -32,5 +34,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = (_event, isCompact) => callback(isCompact);
     ipcRenderer.on('shortcut:compact-changed', listener);
     return () => ipcRenderer.removeListener('shortcut:compact-changed', listener);
+  },
+  onShortcutCopyDescription: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('shortcut:copy-description', listener);
+    return () => ipcRenderer.removeListener('shortcut:copy-description', listener);
+  },
+  onShortcutAvoidMouseChanged: (callback) => {
+    const listener = (_event, enabled) => callback(enabled);
+    ipcRenderer.on('shortcut:avoid-mouse-changed', listener);
+    return () => ipcRenderer.removeListener('shortcut:avoid-mouse-changed', listener);
   },
 });

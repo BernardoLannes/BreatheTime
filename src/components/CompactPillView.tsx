@@ -12,6 +12,7 @@ import {
   Minus,
   Layers,
   Zap,
+  MoveHorizontal,
 } from 'lucide-react';
 import { Project, TaskItem, TimerDivision } from '../types/timer';
 import { useBitrix } from '../bitrix/BitrixContext';
@@ -30,9 +31,11 @@ interface CompactPillViewProps {
   activeDivision: TimerDivision | null;
   now: number;
   alwaysOnTop: boolean;
+  avoidMouse: boolean;
   autoPauseOthers: boolean;
   onToggleAutoPause: () => void;
   onToggleAlwaysOnTop: () => void;
+  onToggleAvoidMouse: () => void;
   onExitCompactMode: () => void;
   onTogglePlayDivision: (divisionId: string) => void;
   onAdjustTimeMs: (divisionId: string, deltaMs: number) => void;
@@ -47,9 +50,11 @@ export const CompactPillView: React.FC<CompactPillViewProps> = ({
   activeDivision,
   now,
   alwaysOnTop,
+  avoidMouse,
   autoPauseOthers,
   onToggleAutoPause,
   onToggleAlwaysOnTop,
+  onToggleAvoidMouse,
   onExitCompactMode,
   onTogglePlayDivision,
   onAdjustTimeMs,
@@ -163,6 +168,19 @@ export const CompactPillView: React.FC<CompactPillViewProps> = ({
           >
             {autoPauseOthers ? <Zap size={12} /> : <Layers size={12} />}
             <span>{autoPauseOthers ? '1x' : 'Multi'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`icon-btn tiny ${avoidMouse ? 'pinned' : ''}`}
+            onClick={onToggleAvoidMouse}
+            title={
+              avoidMouse
+                ? 'Avoid Mouse ATIVO (desvia do mouse quando não está focada)'
+                : 'Ativar Avoid Mouse (desvia para o outro lado da tela ao passar o mouse)'
+            }
+          >
+            <MoveHorizontal size={12} />
           </button>
 
           <button

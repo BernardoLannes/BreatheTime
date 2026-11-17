@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Copy,
   Check,
@@ -6,6 +6,8 @@ import {
   Trash2,
   Clock,
   CheckCircle2,
+  Download,
+  FileText,
 } from 'lucide-react';
 import { CompletedLogEntry } from '../types/timer';
 import { useBitrix } from '../bitrix/BitrixContext';
@@ -33,10 +35,101 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
   onClearHistory,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedSummary, setCopiedSummary] = useState(false);
   const bitrix = useBitrix();
 
   const totalDayMs = entries.reduce((acc, item) => acc + item.durationMs, 0);
   const totalDay = splitDuration(totalDayMs);
+
+  const projectSummary = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; color: string; totalMs: number; count: number }
+    >();
+    for (const e of entries) {
+      const existing = map.get(e.projectName);
+      if (existing) {
+        existing.totalMs += e.durationMs;
+        existing.count += 1;
+      } else {
+        map.set(e.projectName, {
+          name: e.projectName,
+          color: e.projectColor,
+          totalMs: e.durationMs,
+          count: 1,
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) => b.totalMs - a.totalMs);
+  }, [entries]);
+
+  const handleCopySummary = async () => {
+    if (entries.length === 0) return;
+    const lines: string[] = [
+      `Resumo BreatheTime — Total: ${totalDay.paddedHours}h ${totalDay.paddedMinutes}m`,
+      '',
+      'Por Projeto:',
+      ...projectSummary.map((p) => {
+        const d = splitDuration(p.totalMs);
+        return `• ${p.name}: ${d.paddedHours}h ${d.paddedMinutes}m (${p.count} registro${p.count > 1 ? 's' : ''})`;
+      }),
+      '',
+      'Detalhamento:',
+      ...entries.map((e) => {
+        const d = splitDuration(e.durationMs);
+        const desc = formatDivisionClipboardText(
+          e.divisionLabel,
+          e.description,
+          e.taskTitle
+        );
+        return `- [${e.projectName}] ${e.taskTitle} (${d.paddedHours}h${d.paddedMinutes}m): ${desc}`;
+      }),
+    ];
+    const ok = await copyToClipboard(lines.join('\n'));
+    if (ok) {
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 1800);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (entries.length === 0) return;
+    const escapeCsv = (val: string) =>
+      `"${String(val || '').replace(/"/g, '""')}"`;
+    const header = [
+      'Data/Hora',
+      'Projeto',
+      'Tarefa',
+      'Divisao',
+      'Duracao (HH:MM:SS)',
+      'Minutos',
+      'Descricao',
+      'Bitrix Task ID',
+    ].join(';');
+    const rows = entries.map((e) => {
+      const d = splitDuration(e.durationMs);
+      const mins = Math.round(e.durationMs / 60000);
+      const dt = new Date(e.completedAt).toLocaleString('pt-BR');
+      return [
+        escapeCsv(dt),
+        escapeCsv(e.projectName),
+        escapeCsv(e.taskTitle),
+        escapeCsv(e.divisionLabel),
+        escapeCsv(d.formattedHMS),
+        String(mins),
+        escapeCsv(e.description),
+        String(e.bitrixTaskId ?? taskLinks[e.taskId] ?? ''),
+      ].join(';');
+    });
+    const csvContent = '\uFEFF' + [header, ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `breathetime-historico-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleCopyEntry = async (entry: CompletedLogEntry) => {
     const text = formatDivisionClipboardText(
@@ -81,6 +174,52 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
           )}
         </div>
       </div>
+
+      {entries.length > 0 && (
+        <div className="history-project-summary-card">
+          <div className="project-summary-header">
+            <span className="project-summary-title">Resumo por Projeto</span>
+            <div className="project-summary-actions">
+              <button
+                type="button"
+                className={`history-btn ${copiedSummary ? 'copied' : ''}`}
+                onClick={handleCopySummary}
+                title="Copiar resumo diário formatado para o clipboard"
+              >
+                {copiedSummary ? <Check size={12} /> : <FileText size={12} />}
+                <span>{copiedSummary ? 'Copiado!' : 'Copiar Resumo'}</span>
+              </button>
+              <button
+                type="button"
+                className="history-btn"
+                onClick={handleExportCsv}
+                title="Exportar histórico para planilha CSV (Excel)"
+              >
+                <Download size={12} />
+                <span>CSV</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="project-summary-chips">
+            {projectSummary.map((proj) => {
+              const d = splitDuration(proj.totalMs);
+              return (
+                <div key={proj.name} className="project-summary-chip">
+                  <span
+                    className="summary-dot"
+                    style={{ backgroundColor: proj.color }}
+                  />
+                  <span className="summary-proj-name">{proj.name}</span>
+                  <strong className="summary-proj-time">
+                    {d.paddedHours}h {d.paddedMinutes}m
+                  </strong>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {entries.length === 0 ? (
         <div className="history-empty-state">

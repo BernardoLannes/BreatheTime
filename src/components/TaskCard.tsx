@@ -8,6 +8,9 @@ import {
   CheckCheck,
   Trash2,
   Link2,
+  ExternalLink,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { TaskItem, TimerDivision } from '../types/timer';
 import { useBitrix } from '../bitrix/BitrixContext';
@@ -30,6 +33,9 @@ interface TaskCardProps {
   onToggleExpandTask: (taskId: string) => void;
   onUpdateTaskTitle: (taskId: string, title: string) => void;
   onDeleteTask: (taskId: string) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveTask?: (taskId: string, direction: 'up' | 'down') => void;
   onAddDivision: (taskId: string) => void;
   onTogglePlayDivision: (divisionId: string) => void;
   onUpdateDivisionLabel: (divisionId: string, label: string) => void;
@@ -50,6 +56,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onToggleExpandTask,
   onUpdateTaskTitle,
   onDeleteTask,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveTask,
   onAddDivision,
   onTogglePlayDivision,
   onUpdateDivisionLabel,
@@ -62,6 +71,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 }) => {
   const [copiedAll, setCopiedAll] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const bitrix = useBitrix();
 
   const totalTaskMs = divisions.reduce(
@@ -70,6 +80,31 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   );
   const totalTime = splitDuration(totalTaskMs);
   const anyRunning = divisions.some((d) => d.isRunning);
+  const hasContent =
+    totalTaskMs > 0 || divisions.some((d) => Boolean(d.description.trim()));
+
+  const handleDeleteClick = () => {
+    if (!hasContent || confirmDelete) {
+      onDeleteTask(task.id);
+      return;
+    }
+    setConfirmDelete(true);
+    setTimeout(() => setConfirmDelete(false), 3000);
+  };
+
+  const handleOpenInBitrix = () => {
+    if (!task.bitrixTaskId) return;
+    const portal = bitrix.status.portal || 'tdsustentavel.bitrix24.com.br';
+    const uid = bitrix.status.user?.id || 0;
+    const url = uid
+      ? `https://${portal}/company/personal/user/${uid}/tasks/task/view/${task.bitrixTaskId}/`
+      : `https://${portal}/workgroups/group/0/tasks/task/view/${task.bitrixTaskId}/`;
+    if (window.electronAPI?.openExternal) {
+      window.electronAPI.openExternal(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   const handleCopyAllTaskDescriptions = async () => {
     const consolidated = formatConsolidatedTaskDescription(divisions, task.title);
@@ -117,6 +152,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           {task.bitrixTaskId && <span className="bitrix-id-tag">#{task.bitrixTaskId}</span>}
         </button>
 
+        {task.bitrixTaskId && (
+          <button
+            type="button"
+            className="icon-action-btn bitrix-open-btn"
+            onClick={handleOpenInBitrix}
+            title={`Abrir tarefa #${task.bitrixTaskId} no Bitrix24`}
+          >
+            <ExternalLink size={12} />
+          </button>
+        )}
+
         {/* Total Somado da Tarefa (destacado em Horas e Minutos para o Bitrix24) */}
         <div
           className="task-total-badge"
@@ -128,13 +174,40 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <span className="task-sec">{totalTime.paddedSeconds}s</span>
         </div>
 
+        {onMoveTask && (canMoveUp || canMoveDown) && (
+          <div className="reorder-btns">
+            <button
+              type="button"
+              className="icon-action-btn tiny-reorder"
+              onClick={() => onMoveTask(task.id, 'up')}
+              disabled={!canMoveUp}
+              title="Mover tarefa para cima"
+            >
+              <ArrowUp size={11} />
+            </button>
+            <button
+              type="button"
+              className="icon-action-btn tiny-reorder"
+              onClick={() => onMoveTask(task.id, 'down')}
+              disabled={!canMoveDown}
+              title="Mover tarefa para baixo"
+            >
+              <ArrowDown size={11} />
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
-          className="icon-action-btn danger"
-          onClick={() => onDeleteTask(task.id)}
-          title="Excluir tarefa"
+          className={`icon-action-btn danger ${confirmDelete ? 'confirming-del' : ''}`}
+          onClick={handleDeleteClick}
+          title={
+            confirmDelete
+              ? 'Clique novamente para confirmar a exclusão da tarefa'
+              : 'Excluir tarefa'
+          }
         >
-          <Trash2 size={13} />
+          {confirmDelete ? <span className="confirm-del-txt">Excluir?</span> : <Trash2 size={13} />}
         </button>
       </div>
 
@@ -178,6 +251,20 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                       : undefined
                 }
               />
+
+              {bitrix.status.connected && task.bitrixTaskId && totalTaskMs >= 1000 && (
+                <BitrixLogButton
+                  label="Lançar e Concluir"
+                  className="bitrix-log-complete-btn"
+                  onLog={async () => {
+                    const res = await bitrix.logTask(task.id);
+                    if (res.ok) {
+                      onCompleteAllTaskDivisions(task.id);
+                    }
+                    return res;
+                  }}
+                />
+              )}
 
               {divisions.length > 1 && totalTaskMs > 0 && (
                 <button
