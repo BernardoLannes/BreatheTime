@@ -26,6 +26,7 @@ import {
 } from './types/timer';
 import { PRESET_THEMES, applyThemeToDocument } from './utils/themes';
 import { ThemeModal } from './components/ThemeModal';
+import { SettingsModal, BitrixRoundingMode } from './components/SettingsModal';
 import {
   getDivisionElapsedMs,
   splitDuration,
@@ -92,6 +93,7 @@ interface StoredState {
   unfocusedOpacity?: number;
   reminders?: ReminderSettings;
   theme?: ThemeConfig;
+  bitrixRounding?: BitrixRoundingMode;
 }
 
 function getInitialState(): StoredState {
@@ -126,6 +128,7 @@ function getInitialState(): StoredState {
             ...(parsed.reminders || {}),
           },
           theme: parsed.theme || PRESET_THEMES[0],
+          bitrixRounding: parsed.bitrixRounding || 'exact',
         };
       }
     }
@@ -213,6 +216,10 @@ export const App: React.FC = () => {
     initial.theme || PRESET_THEMES[0]
   );
   const [showThemeModal, setShowThemeModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [bitrixRounding, setBitrixRounding] = useState<BitrixRoundingMode>(
+    initial.bitrixRounding || 'exact'
+  );
 
   // Aplicar tema e cores personalizáveis no DOM
   useEffect(() => {
@@ -294,6 +301,7 @@ export const App: React.FC = () => {
       unfocusedOpacity: opacity,
       reminders,
       theme,
+      bitrixRounding,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
@@ -312,6 +320,7 @@ export const App: React.FC = () => {
     opacity,
     reminders,
     theme,
+    bitrixRounding,
   ]);
 
   const handleTogglePlayDivision = useCallback(
@@ -1090,9 +1099,14 @@ export const App: React.FC = () => {
     if (!bitrixTaskId) {
       return { ok: false, message: 'Vincule esta tarefa a uma tarefa do Bitrix24.' };
     }
-    const seconds = Math.round(deltaMs / 1000);
+    let seconds = Math.round(deltaMs / 1000);
     if (seconds < 1) {
       return { ok: false, message: 'Nenhum tempo novo para lançar.' };
+    }
+    if (bitrixRounding === 'ceil_1m') {
+      seconds = Math.ceil(seconds / 60) * 60;
+    } else if (bitrixRounding === 'ceil_5m') {
+      seconds = Math.ceil(seconds / 300) * 300;
     }
     if (bitrixLocks.current.has(lockKey)) {
       return { ok: false, message: 'Lançamento já em andamento.' };
@@ -1358,31 +1372,13 @@ export const App: React.FC = () => {
         alwaysOnTop={alwaysOnTop}
         onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
         onEnterCompactMode={() => handleSetCompactMode(true)}
-        opacity={opacity}
-        onChangeOpacity={handleChangeOpacity}
         autoPauseOthers={autoPauseOthers}
         onToggleAutoPause={handleRequestToggleAutoPause}
         runningCount={runningDivisions.length}
         shortcuts={shortcuts}
-        onUpdateShortcuts={handleUpdateShortcuts}
-        autoLaunch={autoLaunch}
-        onToggleAutoLaunch={handleToggleAutoLaunch}
-        avoidMouse={avoidMouse}
-        onToggleAvoidMouse={handleToggleAvoidMouse}
-        reminders={reminders}
-        onUpdateReminders={(next) => {
-          setReminders(next);
-          if (
-            (next.idleMinutes > 0 || next.breakMinutes > 0) &&
-            'Notification' in window &&
-            Notification.permission === 'default'
-          ) {
-            Notification.requestPermission().catch(() => undefined);
-          }
-        }}
         bitrixConnected={bitrixStatus.connected}
         onOpenBitrix={() => setShowBitrixModal(true)}
-        onOpenThemeModal={() => setShowThemeModal(true)}
+        onOpenSettings={() => setShowSettingsModal(true)}
       />
 
       {reminderBanner && (
@@ -1698,6 +1694,75 @@ export const App: React.FC = () => {
 
       {exitMultiModalNode}
       {bitrixModalNode}
+      {showSettingsModal && (
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          alwaysOnTop={alwaysOnTop}
+          onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
+          autoLaunch={autoLaunch}
+          onToggleAutoLaunch={handleToggleAutoLaunch}
+          avoidMouse={avoidMouse}
+          onToggleAvoidMouse={handleToggleAvoidMouse}
+          opacity={opacity}
+          onChangeOpacity={handleChangeOpacity}
+          theme={theme}
+          onOpenThemeModal={() => setShowThemeModal(true)}
+          bitrixRounding={bitrixRounding}
+          onChangeBitrixRounding={setBitrixRounding}
+          onExportBackup={() => {
+            const payload = {
+              exportedAt: new Date().toISOString(),
+              projects,
+              tasks,
+              divisions,
+              history,
+              presetLabels,
+              shortcuts,
+              reminders,
+              theme,
+              bitrixRounding,
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], {
+              type: 'application/json',
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `breathetime-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          onImportBackup={async (file) => {
+            try {
+              const text = await file.text();
+              const parsed = JSON.parse(text);
+              if (Array.isArray(parsed.projects)) setProjects(parsed.projects);
+              if (Array.isArray(parsed.tasks)) setTasks(parsed.tasks);
+              if (Array.isArray(parsed.divisions)) setDivisions(parsed.divisions);
+              if (Array.isArray(parsed.history)) setHistory(parsed.history);
+              if (Array.isArray(parsed.presetLabels)) setPresetLabels(parsed.presetLabels);
+              if (parsed.theme) setTheme(parsed.theme);
+              if (parsed.bitrixRounding) setBitrixRounding(parsed.bitrixRounding);
+              setReminderBanner('Backup importado com sucesso!');
+            } catch {
+              setReminderBanner('Falha ao importar backup: arquivo JSON inválido.');
+            }
+          }}
+          reminders={reminders}
+          onUpdateReminders={(next) => {
+            setReminders(next);
+            if (
+              (next.idleMinutes > 0 || next.breakMinutes > 0) &&
+              'Notification' in window &&
+              Notification.permission === 'default'
+            ) {
+              Notification.requestPermission().catch(() => undefined);
+            }
+          }}
+          shortcuts={shortcuts}
+          onUpdateShortcuts={handleUpdateShortcuts}
+        />
+      )}
       {showThemeModal && (
         <ThemeModal
           theme={theme}
